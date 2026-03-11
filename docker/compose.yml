@@ -1,0 +1,17 @@
+services:
+  ubuntu22:
+    build:
+      context: ..
+      dockerfile: docker/ubuntu22/Dockerfile
+    tty: true
+    stdin_open: true
+    command: ["bash"]
+
+  debian12:
+    build:
+      context: ..
+      dockerfile: docker/debian12/Dockerfile
+    tty: true
+    stdin_open: true
+    command: ["bash"]
+
