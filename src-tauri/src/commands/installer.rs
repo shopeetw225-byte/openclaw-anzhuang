@@ -48,13 +48,13 @@ pub async fn run_install(app: tauri::AppHandle, script_name: String) -> Result<(
             }
             #[cfg(not(target_os = "windows"))]
             {
-                process_runner::run_bash_script(&app, &script_path)
+                process_runner::run_bash_script(&app, &script_path, &[])
             }
         }
         "ps1" => {
             #[cfg(target_os = "windows")]
             {
-                process_runner::run_powershell_script(&app, &script_path)
+                process_runner::run_powershell_script(&app, &script_path, &[])
             }
             #[cfg(not(target_os = "windows"))]
             {
@@ -77,6 +77,32 @@ fn resolve_script_path(resource_dir: &Path, script_name: &str) -> Option<PathBuf
     }
 
     None
+}
+
+/// 卸载 OpenClaw。purge=true 时同时删除 ~/.openclaw 数据目录。
+#[tauri::command]
+pub async fn run_uninstall(app: tauri::AppHandle, purge: bool) -> Result<(), String> {
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("无法获取资源目录: {e}"))?;
+
+    #[cfg(target_os = "windows")]
+    {
+        let script_path = resolve_script_path(&resource_dir, "windows/uninstall-openclaw.ps1")
+            .ok_or_else(|| "找不到卸载脚本 windows/uninstall-openclaw.ps1".to_string())?;
+        let extra: &[&str] = if purge { &["-Purge"] } else { &[] };
+        process_runner::run_powershell_script(&app, &script_path, extra)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let script_path = resolve_script_path(&resource_dir, "uninstall-openclaw.sh")
+            .ok_or_else(|| "找不到卸载脚本 uninstall-openclaw.sh".to_string())?;
+        make_executable(&script_path)?;
+        let extra: &[&str] = if purge { &["--purge"] } else { &[] };
+        process_runner::run_bash_script(&app, &script_path, extra)
+    }
 }
 
 fn make_executable(path: &Path) -> Result<(), String> {

@@ -1,0 +1,96 @@
+name: Build Windows
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'src-tauri/**'
+      - 'package.json'
+      - '.github/workflows/build-windows.yml'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    name: Build Windows x64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Tauri app
+        run: npm run tauri build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-builds
+          path: src-tauri/target/release/bundle/
+          retention-days: 30
+          compression-level: 9
+
+      - name: List artifacts
+        shell: powershell
+        run: |
+          Write-Host "Build artifacts:"
+          Get-ChildItem -Path "src-tauri/target/release/bundle/" -Recurse -File | ForEach-Object {
+            Write-Host "  - $($_.FullName)"
+            Write-Host "    Size: $([math]::Round($_.Length / 1MB, 2)) MB"
+          }
+
+  test-windows:
+    needs: build-windows
+    runs-on: windows-latest
+    name: Test Windows Build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-builds
+          path: artifacts/
+
+      - name: Test MSI exists
+        shell: powershell
+        run: |
+          $msiFile = Get-ChildItem -Path "artifacts/msi/" -Filter "*.msi" -ErrorAction SilentlyContinue
+          if ($null -eq $msiFile) {
+            Write-Host "❌ MSI file not found!"
+            exit 1
+          }
+          Write-Host "✅ MSI file found: $($msiFile.Name)"
+          Write-Host "   Size: $([math]::Round($msiFile.Length / 1MB, 2)) MB"
+
+      - name: Verify executable
+        shell: powershell
+        run: |
+          $exeFile = Get-ChildItem -Path "artifacts/nsis/" -Filter "*.exe" -ErrorAction SilentlyContinue
+          if ($null -eq $exeFile) {
+            Write-Host "⚠️  NSIS executable not found (optional)"
+          } else {
+            Write-Host "✅ NSIS executable found: $($exeFile.Name)"
+            Write-Host "   Size: $([math]::Round($exeFile.Length / 1MB, 2)) MB"
+          }

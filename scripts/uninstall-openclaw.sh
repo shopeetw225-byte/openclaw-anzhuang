@@ -12,7 +12,30 @@ echo "=== OpenClaw 卸载向导 ==="
 # 步骤 1：停止 Gateway
 echo "[步骤 1/3] 停止 Gateway 服务..."
 
-# macOS：卸载 LaunchAgent
+# 优先用 openclaw gateway uninstall（官方方式，会自动处理 LaunchAgent/systemd）
+OPENCLAW_BIN=""
+for candidate in \
+    "$(which openclaw 2>/dev/null)" \
+    "$HOME/node-v"*"/bin/openclaw" \
+    "$HOME/.nvm/versions/node/"*"/bin/openclaw" \
+    "$HOME/.volta/bin/openclaw" \
+    "/usr/local/bin/openclaw" \
+    "/opt/homebrew/bin/openclaw"; do
+  # 展开 glob
+  for bin in $candidate; do
+    [[ -x "$bin" ]] && OPENCLAW_BIN="$bin" && break 2
+  done
+done
+
+if [[ -n "$OPENCLAW_BIN" ]]; then
+  echo "  使用 $OPENCLAW_BIN gateway uninstall"
+  "$OPENCLAW_BIN" gateway stop 2>/dev/null || true
+  "$OPENCLAW_BIN" gateway uninstall 2>/dev/null || echo "  gateway uninstall 失败（可能已注销）"
+else
+  echo "  未找到 openclaw 命令，降级为手动清理..."
+fi
+
+# macOS 兜底：手动移除 LaunchAgent
 if [[ "$(uname)" == "Darwin" ]]; then
   PLIST="$HOME/Library/LaunchAgents/com.openclaw.gateway.plist"
   if [[ -f "$PLIST" ]]; then

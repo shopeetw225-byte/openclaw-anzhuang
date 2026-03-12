@@ -41,11 +41,32 @@ export interface SaveConfigPayload {
   telegram_enabled: boolean;
   telegram_bot_token: string;
   telegram_allow_from: number[]; // Telegram user IDs
+  // Feishu / Lark
+  feishu_enabled: boolean;
+  feishu_domain: string; // "feishu" | "lark"
+  feishu_app_id: string;
+  feishu_app_secret: string;
+  feishu_bot_name: string;
+}
+
+export interface ConfigSnapshot {
+  model_primary: string | null;
+  telegram_enabled: boolean;
+  telegram_bot_token_set: boolean;
+  telegram_allow_from: number[];
+  env_keys_present: string[]; // keys present in ~/.openclaw/.env (values are never exposed)
+  // Feishu / Lark
+  feishu_enabled: boolean;
+  feishu_domain: string | null;
+  feishu_app_id_set: boolean;
+  feishu_app_secret_set: boolean;
+  feishu_bot_name: string | null;
 }
 
 // Tauri IPC commands (use with invoke() from @tauri-apps/api/core)
 // invoke<SystemInfo>("get_system_info")
 // invoke<void>("run_install", { scriptName: string })  -> emits "install-log" events
+// invoke<ConfigSnapshot>("load_config")
 // invoke<void>("save_config", { config: SaveConfigPayload })
 // invoke<OpenClawStatus>("get_openclaw_status")
 

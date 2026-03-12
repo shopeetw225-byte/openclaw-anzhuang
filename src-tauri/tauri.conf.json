@@ -36,6 +36,20 @@
     "resources": {
       "../scripts": "scripts"
     },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "signingIdentity": null,
+      "allowSignless": true,
+      "webviewInstallMode": {
+        "silent": true,
+        "runAfterInstall": true
+      },
+      "wix": null
+    },
+    "macOS": {
+      "entitlements": null
+    },
     "linux": {
       "deb": {
         "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0", "libayatana-appindicator3-1"]

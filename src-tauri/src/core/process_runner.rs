@@ -26,11 +26,13 @@ const PROGRESS_RULES: [(&str, u8); 12] = [
     ("Done", 100),
 ];
 
-pub fn run_bash_script(app: &AppHandle, script_path: &Path) -> Result<(), String> {
+pub fn run_bash_script(app: &AppHandle, script_path: &Path, extra_args: &[&str]) -> Result<(), String> {
     emit_log(app, "Starting", 0, format!("开始执行脚本: {}", script_path.display()));
 
     let child = Command::new("bash")
         .arg(script_path)
+        .args(extra_args)
+        .env("PATH", build_node_path())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -41,7 +43,7 @@ pub fn run_bash_script(app: &AppHandle, script_path: &Path) -> Result<(), String
 }
 
 #[cfg(target_os = "windows")]
-pub fn run_powershell_script(app: &AppHandle, script_path: &Path) -> Result<(), String> {
+pub fn run_powershell_script(app: &AppHandle, script_path: &Path, extra_args: &[&str]) -> Result<(), String> {
     use std::io::ErrorKind;
 
     emit_log(
@@ -54,6 +56,7 @@ pub fn run_powershell_script(app: &AppHandle, script_path: &Path) -> Result<(), 
     let child = Command::new("powershell")
         .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
         .arg(script_path)
+        .args(extra_args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -199,17 +202,54 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// 流式运行任意命令，将 stdout/stderr 实时 emit 为 install-log 事件
+/// 流式运行任意命令，将 stdout/stderr 实时 emit 为 install-log 事件。
+/// 自动将 Node.js bin 目录注入 PATH，确保 openclaw/npm 等 Node.js 脚本的
+/// #!/usr/bin/env node shebang 在打包 App 的受限 PATH 下也能正常工作。
 pub fn stream_command(app: &AppHandle, program: &str, args: &[&str]) -> Result<(), String> {
     emit_log(app, "Starting", 0, format!("运行: {} {}", program, args.join(" ")));
 
-    let child = std::process::Command::new(program)
-        .args(args)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("启动命令失败: {e}"))?;
+    #[cfg(target_os = "windows")]
+    let mut cmd = {
+        let lower = program.to_ascii_lowercase();
+        if lower.ends_with(".cmd") || lower.ends_with(".bat") {
+            let mut c = std::process::Command::new("cmd");
+            c.arg("/C").arg(program).args(args);
+            c
+        } else {
+            let mut c = std::process::Command::new(program);
+            c.args(args);
+            c
+        }
+    };
 
+    #[cfg(not(target_os = "windows"))]
+    let mut cmd = {
+        let mut c = std::process::Command::new(program);
+        c.args(args);
+        c
+    };
+
+    cmd.stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+
+    // 注入 node bin 目录，否则 Node.js 脚本的 shebang 在打包 App 中找不到 node
+    cmd.env("PATH", build_node_path());
+
+    let child = cmd.spawn().map_err(|e| format!("启动命令失败: {e}"))?;
     run_child_with_logs(app, child, "命令执行失败")
+}
+
+/// 构造包含 Node.js bin 目录的 PATH 字符串
+fn build_node_path() -> String {
+    let base = std::env::var_os("PATH").unwrap_or_default();
+    let mut paths: Vec<std::path::PathBuf> = Vec::new();
+    if let Some(dir) = crate::core::platform::node_bin_dir() {
+        paths.push(dir);
+    }
+    paths.extend(std::env::split_paths(&base));
+    std::env::join_paths(paths)
+        .unwrap_or(base)
+        .to_string_lossy()
+        .to_string()
 }

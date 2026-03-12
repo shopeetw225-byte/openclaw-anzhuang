@@ -49,7 +49,7 @@ function friendlyError(raw: string): string {
 
   // WSL 未安装
   if (msg.includes('wsl') && (msg.includes('not found') || msg.includes('未检测到'))) {
-    return 'WSL 未安装或不可用，请先手动安装 WSL2，或重启后再试。'
+    return 'WSL 未安装或不可用。\n解决方案：\n1. 以管理员身份运行本安装器\n2. 或手动执行：powershell -Command "wsl --install -d Ubuntu"\n3. 或在 Microsoft Store 搜索 Ubuntu 并安装'
   }
 
   // npm 失败
@@ -121,19 +121,38 @@ export default function Installing() {
         }
 
         const wslState = (systemInfo as unknown as { wsl_state?: string | null }).wsl_state ?? null
+        const wslHasUbuntu = (systemInfo as unknown as { wsl_has_ubuntu?: boolean }).wsl_has_ubuntu ?? false
         if (wslState === null) {
           return ['install-macos.sh']
         }
 
+        // WSL 已可用
         if (wslState === 'available') {
-          return ['install-linux.sh']
+          if (wslHasUbuntu) {
+            // WSL + Ubuntu 都有，直接在 WSL 中安装
+            return ['install-linux.sh']
+          }
+          // WSL 存在但没有 Ubuntu，安装 Ubuntu 到已有 WSL
+          return ['windows/install-ubuntu.ps1']
         }
 
+        // WSL 未安装但支持
         if (wslState === 'needs_install') {
           return ['windows/install-wsl.ps1']
         }
 
+        // 系统不支持 WSL2（比如家庭版 Win10），改用原生 PowerShell 路径
         if (wslState === 'unsupported') {
+          return [
+            'windows/install-node-windows.ps1',
+            'windows/install-openclaw.ps1',
+            'windows/install-nssm.ps1',
+            'windows/register-service-nssm.ps1',
+          ]
+        }
+
+        // 无法确定 WSL 状态，尝试原生 Windows 路径
+        if (wslState === 'unknown') {
           return [
             'windows/install-node-windows.ps1',
             'windows/install-openclaw.ps1',
@@ -180,6 +199,7 @@ export default function Installing() {
         if (runIdRef.current !== runId) return
         if (cancelRequestedRef.current) return
 
+        // 处理 WSL 安装后的状态刷新
         if (scriptName === 'windows/install-wsl.ps1') {
           const refreshed = await invoke<SystemInfo>('get_system_info')
           useInstallStore.getState().setSystemInfo(refreshed)
@@ -188,7 +208,8 @@ export default function Installing() {
           if (cancelRequestedRef.current) return
 
           const refreshedWslState = (refreshed as unknown as { wsl_state?: string | null }).wsl_state ?? null
-          if (refreshedWslState === 'available') {
+          const refreshedHasUbuntu = (refreshed as unknown as { wsl_has_ubuntu?: boolean }).wsl_has_ubuntu ?? false
+          if (refreshedWslState === 'available' && refreshedHasUbuntu) {
             if (!currentPlan.includes('install-linux.sh')) {
               currentPlan = [...currentPlan, 'install-linux.sh']
               planRef.current = currentPlan
@@ -197,7 +218,34 @@ export default function Installing() {
             continue
           }
 
-          setError('WSL 安装完成，需要重启电脑才能继续。\n请重启后重新打开安装器，点击"重试"从断点继续安装。')
+          if (refreshedWslState === 'available' && !refreshedHasUbuntu) {
+            setError('已检测到 WSL，但未检测到 Ubuntu 发行版。\n解决方案：\n1. 手动在 Microsoft Store 搜索"Ubuntu"并安装\n2. 或以管理员身份运行：powershell -Command "wsl --install -d Ubuntu"\n3. 安装完成后，点击"重试"继续安装')
+            return
+          }
+
+          setError('✓ WSL 安装完成，需要重启电脑才能继续。\n请重启后重新打开安装器，点击"重试"从断点继续安装。')
+          return
+        }
+
+        // 处理 Ubuntu 安装后的状态刷新
+        if (scriptName === 'windows/install-ubuntu.ps1') {
+          const refreshed = await invoke<SystemInfo>('get_system_info')
+          useInstallStore.getState().setSystemInfo(refreshed)
+
+          if (runIdRef.current !== runId) return
+          if (cancelRequestedRef.current) return
+
+          const refreshedHasUbuntu = (refreshed as unknown as { wsl_has_ubuntu?: boolean }).wsl_has_ubuntu ?? false
+          if (refreshedHasUbuntu) {
+            if (!currentPlan.includes('install-linux.sh')) {
+              currentPlan = [...currentPlan, 'install-linux.sh']
+              planRef.current = currentPlan
+              setPlan(currentPlan)
+            }
+            continue
+          }
+
+          setError('Ubuntu 发行版安装可能需要重启。\n请重启电脑后打开安装器，点击"重试"继续。\n或手动在 Microsoft Store 安装 Ubuntu。')
           return
         }
       }

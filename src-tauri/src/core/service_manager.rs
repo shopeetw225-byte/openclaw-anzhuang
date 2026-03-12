@@ -396,9 +396,17 @@ fn find_in_path_by_where(name: &str) -> Option<PathBuf> {
     }
 
     let stdout = String::from_utf8_lossy(&out.stdout);
-    let first = stdout.lines().next()?.trim();
-    if first.is_empty() {
-        return None;
+    // 优先选择第一个存在且可执行的候选项
+    for line in stdout.lines() {
+        let path = line.trim();
+        if path.is_empty() {
+            continue;
+        }
+        let pb = PathBuf::from(path);
+        // 验证文件确实存在
+        if pb.is_file() {
+            return Some(pb);
+        }
     }
-    Some(PathBuf::from(first))
+    None
 }

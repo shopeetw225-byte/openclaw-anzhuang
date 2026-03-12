@@ -32,34 +32,43 @@ export default function LogPanel({ logs, className }: LogPanelProps) {
 
   return (
     <div
-      className={`rounded-xl border border-[var(--border)] ${className ?? ''}`}
+      className={className}
       style={{
-        background: '#1a1a1a',
+        background: '#fff',
+        borderRadius: 12,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        overflow: 'hidden',
       }}
     >
-      <style>
-        {`
+      <style>{`
 @keyframes oc-log-fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.oc-log-line-latest { animation: oc-log-fade-in 180ms ease-out; }
-`}
-      </style>
+.oc-log-line-latest { animation: oc-log-fade-in 160ms ease-out; }
+`}</style>
 
       <div
         ref={containerRef}
-        className="max-h-[360px] overflow-auto p-3 text-sm leading-relaxed"
         style={{
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-          color: '#22c55e',
+          maxHeight: 320,
+          overflowY: 'auto',
+          padding: '10px 14px',
+          fontSize: 11,
+          lineHeight: 1.7,
+          fontFamily: 'ui-monospace, "SF Mono", Menlo, Monaco, monospace',
+          color: '#3C3C43',
         }}
       >
         {lines.length === 0 ? (
-          <div style={{ color: '#86efac' }}>等待日志输出...</div>
+          <div style={{ color: '#AEAEB2' }}>等待日志输出...</div>
         ) : (
           lines.map((l, idx) => (
-            <div key={l.key} className={idx === lines.length - 1 ? 'oc-log-line-latest' : undefined}>
+            <div
+              key={l.key}
+              className={idx === lines.length - 1 ? 'oc-log-line-latest' : undefined}
+              style={{ wordBreak: 'break-all' }}
+            >
               {l.text}
             </div>
           ))
@@ -68,4 +77,3 @@ export default function LogPanel({ logs, className }: LogPanelProps) {
     </div>
   )
 }
-

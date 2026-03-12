@@ -23,6 +23,8 @@
 - 设计风格：OpenClaw 暖棕色系（`--accent: #c94b1d`, `--bg: #f3efe7`）
 - 安装方式：用户级 Node.js（无需 sudo/管理员，Windows 例外）
 - 配置文件：`~/.openclaw/openclaw.json`（写入前自动 .bak 备份）
+- 配置密钥：API Key 写入 `~/.openclaw/.env`（不会在 UI 中回显；修改配置时留空表示不变）
+- 更新：检查 npm registry 版本；一键执行 `npm install -g openclaw@latest`
 
 ## 快速开始（开发）
 

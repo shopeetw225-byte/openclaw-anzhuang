@@ -28,13 +28,6 @@ const MOCK_SYSTEM_INFO: SystemInfo & { distro_id: string | null; systemd_availab
 
 type CardTone = 'success' | 'warning' | 'error' | 'loading'
 
-function toneIcon(tone: CardTone) {
-  if (tone === 'success') return '✅'
-  if (tone === 'warning') return '⚠️'
-  if (tone === 'error') return '❌'
-  return '⟳'
-}
-
 function formatDiskMb(mb: number) {
   if (!Number.isFinite(mb) || mb <= 0) return '未知'
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`
@@ -46,58 +39,61 @@ function formatTime(ts: number) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-function InfoCard({
-  title,
-  tone,
-  value,
-  sub,
-  loading,
-}: {
+const TONE_COLOR: Record<CardTone, string> = {
+  success: '#34C759',
+  warning: '#FF9500',
+  error:   '#FF3B30',
+  loading: '#AEAEB2',
+}
+
+const TONE_ICON: Record<CardTone, string> = {
+  success: '✓',
+  warning: '!',
+  error:   '✗',
+  loading: '…',
+}
+
+function InfoCard({ title, tone, value, sub, loading }: {
   title: string
   tone: CardTone
   value: string
   sub?: string
   loading?: boolean
 }) {
+  const color = TONE_COLOR[tone]
+
   return (
-    <div
-      className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4"
-      style={{
-        background: 'var(--bg-card, #faf7f2)',
-        border: '1px solid var(--border, #d4c5b5)',
-        borderRadius: 12,
-        padding: 16,
-        minHeight: 92,
-      }}
-    >
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-semibold text-[var(--text-primary)]" style={{ color: 'var(--text-primary, #2c1810)' }}>
-          {title}
-        </div>
-        <div aria-hidden="true">{loading ? toneIcon('loading') : toneIcon(tone)}</div>
+    <div style={{
+      background: '#fff',
+      borderRadius: 12,
+      padding: '14px 16px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+      minHeight: 82,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#636366' }}>{title}</span>
+        <span style={{
+          width: 20, height: 20,
+          borderRadius: '50%',
+          background: loading ? 'rgba(60,60,67,0.1)' : `${color}20`,
+          color: loading ? '#AEAEB2' : color,
+          fontSize: 11,
+          fontWeight: 700,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {TONE_ICON[loading ? 'loading' : tone]}
+        </span>
       </div>
 
       {loading ? (
-        <div className="mt-3">
-          <div
-            className="h-4 w-3/4 rounded-md bg-black/10"
-            style={{ height: 16, width: '75%', borderRadius: 6, background: 'rgba(0,0,0,0.08)' }}
-          />
-          <div
-            className="mt-2 h-3 w-1/2 rounded-md bg-black/10"
-            style={{ marginTop: 8, height: 12, width: '50%', borderRadius: 6, background: 'rgba(0,0,0,0.06)' }}
-          />
+        <div>
+          <div style={{ height: 14, width: '70%', borderRadius: 6, background: 'rgba(0,0,0,0.06)' }} />
+          <div style={{ height: 11, width: '45%', borderRadius: 6, background: 'rgba(0,0,0,0.04)', marginTop: 6 }} />
         </div>
       ) : (
         <>
-          <div className="mt-3 text-lg font-semibold text-[var(--text-primary)]" style={{ color: 'var(--text-primary, #2c1810)' }}>
-            {value}
-          </div>
-          {sub ? (
-            <div className="mt-1 text-xs text-[var(--text-secondary)]" style={{ color: 'var(--text-secondary, #6b4c3b)' }}>
-              {sub}
-            </div>
-          ) : null}
+          <div style={{ fontSize: 16, fontWeight: 600, color: '#000', letterSpacing: -0.3 }}>{value}</div>
+          {sub && <div style={{ fontSize: 12, color: '#AEAEB2', marginTop: 3 }}>{sub}</div>}
         </>
       )}
     </div>
@@ -112,10 +108,20 @@ export default function Welcome() {
   const [hint, setHint] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
 
-  const windowsInfo = systemInfo as unknown as { wsl_state?: string | null; windows_admin?: boolean } | null
+  const windowsInfo = systemInfo as unknown as {
+    wsl_state?: string | null
+    wsl_default_distro?: string | null
+    wsl_has_ubuntu?: boolean
+    windows_admin?: boolean
+  } | null
   const wslState = windowsInfo?.wsl_state ?? null
+  const wslDefaultDistro = windowsInfo?.wsl_default_distro ?? null
+  const wslHasUbuntu = Boolean(windowsInfo?.wsl_has_ubuntu)
   const isWindows = wslState !== null
   const windowsAdmin = Boolean(windowsInfo?.windows_admin)
+
+  // Windows 用户需要管理员权限来安装 WSL/Node/服务
+  const needsAdminPrivileges = isWindows && !windowsAdmin
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -123,7 +129,7 @@ export default function Welcome() {
 
     if (!isTauriRuntime()) {
       setSystemInfo(MOCK_SYSTEM_INFO)
-      setHint('浏览器预览模式：未连接到 Tauri，显示模拟数据')
+      setHint('浏览器预览模式')
       setLastUpdated(Date.now())
       setLoading(false)
       return
@@ -135,27 +141,39 @@ export default function Welcome() {
       setLastUpdated(Date.now())
     } catch (e) {
       setSystemInfo(MOCK_SYSTEM_INFO)
-      setHint(e instanceof Error ? `获取系统信息失败：${e.message}` : '获取系统信息失败')
+      setHint(e instanceof Error ? e.message : '获取系统信息失败')
       setLastUpdated(Date.now())
     } finally {
       setLoading(false)
     }
   }, [setSystemInfo])
 
+  useEffect(() => { void refresh() }, [refresh])
   useEffect(() => {
-    void refresh()
+    const id = window.setInterval(() => void refresh(), 30_000)
+    return () => window.clearInterval(id)
   }, [refresh])
 
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      void refresh()
-    }, 30_000)
-    return () => window.clearInterval(id)
+  const startGateway = useCallback(async () => {
+    if (!isTauriRuntime()) {
+      setHint('浏览器预览模式无法启动 Gateway')
+      return
+    }
+    setHint(null)
+    try {
+      await invoke('start_gateway')
+      await refresh()
+    } catch (e) {
+      setHint(e instanceof Error ? e.message : '启动 Gateway 失败')
+    }
   }, [refresh])
 
   const cards = useMemo(() => {
     const info = systemInfo
     const isLoading = loading && !info
+
+    const distroId = (info as unknown as { distro_id?: string | null })?.distro_id ?? null
+    const osTitle = isWindows ? 'Windows' : distroId !== null ? 'Linux' : 'macOS'
 
     const openclawTone: CardTone = !info || isLoading ? 'loading' : info.openclaw_installed ? 'success' : 'error'
     const gatewayTone: CardTone =
@@ -163,7 +181,7 @@ export default function Welcome() {
 
     const cards = [
       {
-        title: 'macOS',
+        title: osTitle,
         tone: (!info || isLoading ? 'loading' : 'success') as CardTone,
         value: info ? info.os_name : '—',
         sub: info ? info.arch : undefined,
@@ -172,49 +190,34 @@ export default function Welcome() {
         title: 'Node.js',
         tone: (!info || isLoading ? 'loading' : info.node_version ? 'success' : 'error') as CardTone,
         value: info?.node_version ?? '未检测到',
-        sub: undefined,
       },
       {
         title: 'npm',
         tone: (!info || isLoading ? 'loading' : info.npm_version ? 'success' : 'error') as CardTone,
         value: info?.npm_version ?? '未检测到',
-        sub: undefined,
       },
       {
         title: 'OpenClaw',
         tone: openclawTone,
         value: !info ? '—' : info.openclaw_installed ? '已安装' : '未安装',
-        sub: info?.openclaw_version ? `版本：${info.openclaw_version}` : undefined,
+        sub: info?.openclaw_version ? `版本 ${info.openclaw_version}` : undefined,
       },
       {
         title: 'Gateway',
         tone: gatewayTone,
         value: !info ? '—' : !info.openclaw_installed ? '未安装' : info.gateway_running ? '运行中' : '未运行',
-        sub: info?.gateway_running ? `端口：${info.gateway_port}` : undefined,
+        sub: info?.gateway_running ? `端口 ${info.gateway_port}` : undefined,
       },
     ]
 
-    // 磁盘空间卡片（追加到现有卡片数组末尾）
-    // 阈值：< 2048 MB (2 GB) 警告，< 512 MB 阻止安装
     const diskFreeMb = info?.disk_free_mb ?? null
-
     if (diskFreeMb !== null) {
       const diskTone: CardTone = diskFreeMb < 512 ? 'error' : diskFreeMb < 2048 ? 'warning' : 'success'
-
-      const diskText = formatDiskMb(diskFreeMb)
-
-      const diskSub =
-        diskFreeMb < 512
-          ? '磁盘空间严重不足，安装将失败，请先清理磁盘'
-          : diskFreeMb < 2048
-            ? '磁盘空间较少，建议先清理后再安装'
-            : '空间充裕'
-
       cards.push({
-        title: '磁盘剩余空间',
+        title: '磁盘剩余',
         tone: diskTone,
-        value: diskText,
-        sub: diskSub,
+        value: formatDiskMb(diskFreeMb),
+        sub: diskFreeMb < 512 ? '空间严重不足' : diskFreeMb < 2048 ? '建议先清理' : '空间充裕',
       })
     }
 
@@ -227,55 +230,64 @@ export default function Welcome() {
 
   const primaryAction = useMemo(() => {
     if (!installed) {
-      return { label: '一键安装', onClick: () => navigate('/installing') as void, disabled: diskTooLow }
+      return {
+        label: '一键安装',
+        onClick: () => navigate('/installing') as void,
+        disabled: diskTooLow || needsAdminPrivileges,
+      }
     }
-    if (installed && !gatewayRunning) {
-      return { label: '启动 Gateway（M2 实现）', onClick: () => {}, disabled: true }
-    }
-    return { label: '进入管理', onClick: () => navigate('/dashboard') as void, disabled: false }
-  }, [installed, gatewayRunning, navigate, diskTooLow])
+    if (installed && !gatewayRunning) return { label: '启动 Gateway', onClick: () => void startGateway(), disabled: false }
+    return { label: '进入控制台', onClick: () => navigate('/dashboard') as void, disabled: false }
+  }, [installed, gatewayRunning, navigate, diskTooLow, needsAdminPrivileges, startGateway])
 
   const secondaryAction = useMemo(() => {
     if (installed && gatewayRunning) return null
-    if (!installed) {
-      return { label: '进入管理', onClick: () => navigate('/dashboard') as void, disabled: true }
-    }
-    return { label: '进入管理', onClick: () => navigate('/dashboard') as void, disabled: false }
+    if (!installed) return { label: '进入控制台', onClick: () => navigate('/dashboard') as void, disabled: true }
+    return { label: '进入控制台', onClick: () => navigate('/dashboard') as void, disabled: false }
   }, [installed, gatewayRunning, navigate])
 
   return (
-    <div className="min-h-screen bg-[var(--bg)]" style={{ background: 'var(--bg, #f3efe7)' }}>
-      <div
-        className="flex items-center justify-between px-6 py-3 text-white"
-        style={{ background: 'var(--accent, #c94b1d)' }}
-      >
-        <div className="text-base font-semibold">🦞 OpenClaw 安装器</div>
-        <div className="text-sm opacity-90">v0.1</div>
+    <div style={{ minHeight: '100vh', background: '#F2F2F7' }}>
+
+      {/* Header */}
+      <div style={{
+        background: 'rgba(242,242,247,0.92)',
+        backdropFilter: 'saturate(180%) blur(20px)',
+        WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+        borderBottom: '0.5px solid rgba(60,60,67,0.2)',
+        height: 52,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 20px',
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
+      }}>
+        <span style={{ fontSize: 17, fontWeight: 600, color: '#000', letterSpacing: -0.3 }}>
+          OpenClaw 安装器
+        </span>
+        <button
+          onClick={() => void refresh()}
+          style={{
+            background: 'none', border: 'none',
+            color: '#007AFF', fontSize: 13, cursor: 'pointer',
+            padding: '4px 8px', borderRadius: 6,
+          }}
+        >
+          重新检测
+        </button>
       </div>
 
-      <div className="mx-auto max-w-3xl px-6 py-8">
-        <div className="flex items-center justify-between">
-          <div className="text-lg font-semibold text-[var(--text-primary)]" style={{ color: 'var(--text-primary, #2c1810)' }}>
-            环境检测
-          </div>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)]"
-            style={{
-              border: '1px solid var(--border, #d4c5b5)',
-              color: 'var(--text-secondary, #6b4c3b)',
-              background: 'transparent',
-            }}
-          >
-            重新检测
-          </button>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px 20px' }}>
+
+        {/* Section title */}
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#636366', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
+          环境检测
         </div>
 
-        <div
-          className="mt-4 grid grid-cols-2 gap-4"
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}
-        >
+        {/* Cards grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 16 }}>
           {cards.map((c) => (
             <InfoCard
               key={c.title}
@@ -288,58 +300,76 @@ export default function Welcome() {
           ))}
         </div>
 
-        <div className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4" style={{ background: 'var(--bg-card, #faf7f2)', border: '1px solid var(--border, #d4c5b5)', borderRadius: 12, padding: 16 }}>
-          <div className="flex flex-col gap-3 sm:flex-row">
+        {/* Action card */}
+        <div style={{
+          background: '#fff',
+          borderRadius: 12,
+          padding: '16px 20px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button
-              type="button"
               disabled={primaryAction.disabled}
               onClick={primaryAction.onClick}
-              className="rounded-lg px-6 py-2 text-white disabled:opacity-50"
               style={{
-                background: 'var(--accent, #c94b1d)',
-                opacity: primaryAction.disabled ? 0.5 : 1,
+                padding: '10px 24px',
+                borderRadius: 10,
+                fontSize: 15,
+                fontWeight: 600,
+                background: primaryAction.disabled ? '#AEAEB2' : '#007AFF',
+                color: '#fff',
+                border: 'none',
                 cursor: primaryAction.disabled ? 'not-allowed' : 'pointer',
+                letterSpacing: -0.2,
               }}
             >
               {primaryAction.label}
             </button>
 
-            {secondaryAction ? (
+            {secondaryAction && (
               <button
-                type="button"
                 disabled={secondaryAction.disabled}
                 onClick={secondaryAction.onClick}
-                className="rounded-lg border border-[var(--border)] px-6 py-2 text-[var(--text-secondary)] disabled:opacity-50"
                 style={{
-                  border: '1px solid var(--border, #d4c5b5)',
-                  color: 'var(--text-secondary, #6b4c3b)',
-                  background: 'transparent',
-                  opacity: secondaryAction.disabled ? 0.5 : 1,
+                  padding: '10px 24px',
+                  borderRadius: 10,
+                  fontSize: 15,
+                  fontWeight: 500,
+                  background: 'rgba(0,122,255,0.08)',
+                  color: secondaryAction.disabled ? '#AEAEB2' : '#007AFF',
+                  border: 'none',
                   cursor: secondaryAction.disabled ? 'not-allowed' : 'pointer',
                 }}
               >
                 {secondaryAction.label}
               </button>
-            ) : null}
+            )}
           </div>
 
-          {!installed && diskTooLow ? (
-            <p className="text-sm mt-2" style={{ color: 'var(--error, #dc2626)' }}>
+          {!installed && diskTooLow && (
+            <p style={{ margin: '10px 0 0', fontSize: 13, color: '#FF3B30' }}>
               磁盘剩余空间不足 512 MB，请先清理磁盘再安装。
             </p>
-          ) : null}
+          )}
 
-          <div className="mt-3 text-sm text-[var(--text-secondary)]" style={{ color: 'var(--text-secondary, #6b4c3b)' }}>
-            <div>
-              {loading ? '⟳ 正在检测...' : hint ? `⚠️ ${hint}` : lastUpdated ? `✅ 已更新：${formatTime(lastUpdated)}` : '—'}
-            </div>
-            {!loading && isWindows ? (
-              <div className="mt-1 text-xs opacity-90">
-                WSL：{String(wslState)}；管理员权限：{windowsAdmin ? '是' : '否'}
-              </div>
-            ) : null}
+          {needsAdminPrivileges && (
+            <p style={{ margin: '10px 0 0', fontSize: 13, color: '#FF9500' }}>
+              ⚠️ Windows 安装需要管理员权限。请右键点击本安装器，选择"以管理员身份运行"。
+            </p>
+          )}
+
+          <div style={{ marginTop: 12, fontSize: 12, color: '#AEAEB2' }}>
+            {loading ? '正在检测...' : hint ? `⚠ ${hint}` : lastUpdated ? `已更新 ${formatTime(lastUpdated)}` : '—'}
+            {!loading && isWindows && (
+              <span style={{ marginLeft: 10 }}>
+                WSL：{String(wslState)}
+                {wslDefaultDistro ? `（默认：${wslDefaultDistro}）` : ''}
+                · Ubuntu：{wslHasUbuntu ? '是' : '否'} · 管理员：{windowsAdmin ? '是' : '否'}
+              </span>
+            )}
           </div>
         </div>
+
       </div>
     </div>
   )

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useNavigate } from 'react-router-dom'
 import LogPanel from '../components/LogPanel'
@@ -59,6 +59,10 @@ export default function Update() {
     }
   }, [])
 
+  useEffect(() => {
+    void checkUpdate()
+  }, [checkUpdate])
+
   const doUpdate = useCallback(async () => {
     setUpdating(true)
     setDone(false)
@@ -80,6 +84,16 @@ export default function Update() {
       setUpdating(false)
     }
   }, [clearLogs])
+
+  const actionLabel = useMemo(() => {
+    if (!info) return '一键更新'
+    return info.current_version ? '一键更新' : '一键安装'
+  }, [info])
+
+  const doneLabel = useMemo(() => {
+    if (!info) return '完成！'
+    return info.current_version ? '更新完成！重启 Gateway 后生效。' : '安装完成！可返回控制台启动 Gateway。'
+  }, [info])
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg, #f3efe7)' }}>
@@ -122,10 +136,17 @@ export default function Update() {
             <div
               className="text-sm mb-4"
               style={{
-                color: info.update_available ? 'var(--warning, #b45309)' : 'var(--success, #2d7a4f)',
+                color:
+                  info.current_version == null || info.update_available
+                    ? 'var(--warning, #b45309)'
+                    : 'var(--success, #2d7a4f)',
               }}
             >
-              {info.update_available ? '有新版本可更新' : '已是最新版本'}
+              {info.current_version == null
+                ? '未检测到本地 OpenClaw，可一键安装'
+                : info.update_available
+                  ? '有新版本可更新'
+                  : '已是最新版本'}
             </div>
           )}
           {error && (
@@ -135,7 +156,7 @@ export default function Update() {
           )}
           {done && (
             <div className="text-sm mb-4" style={{ color: 'var(--success, #2d7a4f)' }}>
-              更新完成！重启 Gateway 后生效。
+              {doneLabel}
             </div>
           )}
 
@@ -164,7 +185,7 @@ export default function Update() {
                   opacity: updating ? 0.5 : 1,
                 }}
               >
-                {updating ? '更新中...' : '一键更新'}
+                {updating ? '执行中...' : actionLabel}
               </button>
             )}
           </div>
@@ -179,4 +200,3 @@ export default function Update() {
     </div>
   )
 }
-

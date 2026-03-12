@@ -8,6 +8,9 @@ import Dashboard from './pages/Dashboard'
 import Repair from './pages/Repair'
 import Update from './pages/Update'
 import Uninstall from './pages/Uninstall'
+import Agent from './pages/Agent'
+import AgentConfig from './pages/AgentConfig'
+import AgentRepair from './pages/AgentRepair'
 import type { OpenClawStatus } from './types/ipc'
 
 function App() {
@@ -34,8 +37,10 @@ function App() {
           alignItems: 'center',
           justifyContent: 'center',
           height: '100vh',
-          background: 'var(--bg,#f3efe7)',
-          color: 'var(--text-secondary,#6b4c3b)',
+          background: '#F2F2F7',
+          color: '#636366',
+          fontFamily: '-apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
+          fontSize: 15,
         }}
       >
         正在检测...
@@ -45,25 +50,47 @@ function App() {
 
   return (
     <>
-      <style>
-        {`
+      <style>{`
 :root {
-  --accent: #c94b1d;
-  --accent-hover: #a83c17;
-  --bg: #f3efe7;
-  --bg-card: #faf7f2;
-  --text-primary: #2c1810;
-  --text-secondary: #6b4c3b;
-  --border: #d4c5b5;
-  --success: #2d7a4f;
-  --warning: #b45309;
-  --error: #dc2626;
+  /* iOS System Colors */
+  --accent:          #007AFF;
+  --accent-hover:    #0062CC;
+  --bg:              #F2F2F7;
+  --card:            #FFFFFF;
+  --bg-card:         #FFFFFF;
+  --text:            #000000;
+  --text-primary:    #000000;
+  --text-secondary:  #636366;
+  --text-muted:      #AEAEB2;
+  --border:          rgba(60,60,67,0.18);
+  --separator:       rgba(60,60,67,0.12);
+  --success:         #34C759;
+  --warning:         #FF9500;
+  --error:           #FF3B30;
+  --shadow:          0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
 }
-html, body, #root { height: 100%; }
-body { margin: 0; background: var(--bg); color: var(--text-primary); }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
 * { box-sizing: border-box; }
-`}
-      </style>
+
+button { font-family: inherit; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(60,60,67,0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(60,60,67,0.35); }
+`}</style>
 
       <BrowserRouter>
         <Routes>
@@ -75,6 +102,9 @@ body { margin: 0; background: var(--bg); color: var(--text-primary); }
           <Route path="/repair" element={<Repair />} />
           <Route path="/update" element={<Update />} />
           <Route path="/uninstall" element={<Uninstall />} />
+          <Route path="/agent" element={<Agent />} />
+          <Route path="/agent-config" element={<AgentConfig />} />
+          <Route path="/agent-repair" element={<AgentRepair />} />
         </Routes>
       </BrowserRouter>
     </>

@@ -45,6 +45,27 @@ pub struct SaveConfigPayload {
     pub telegram_enabled: bool,
     pub telegram_bot_token: String,
     pub telegram_allow_from: Vec<i64>,
+    // Feishu / Lark
+    pub feishu_enabled: bool,
+    pub feishu_domain: String,
+    pub feishu_app_id: String,
+    pub feishu_app_secret: String,
+    pub feishu_bot_name: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct ConfigSnapshot {
+    pub model_primary: Option<String>,
+    pub telegram_enabled: bool,
+    pub telegram_bot_token_set: bool,
+    pub telegram_allow_from: Vec<i64>,
+    pub env_keys_present: Vec<String>,
+    // Feishu / Lark
+    pub feishu_enabled: bool,
+    pub feishu_domain: Option<String>,
+    pub feishu_app_id_set: bool,
+    pub feishu_app_secret_set: bool,
+    pub feishu_bot_name: Option<String>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -96,6 +117,8 @@ pub fn run() {
             commands::sysinfo::get_system_info,
             commands::sysinfo::get_openclaw_status,
             commands::installer::run_install,
+            commands::installer::run_uninstall,
+            commands::config::load_config,
             commands::config::save_config,
             commands::openclaw::get_detailed_status,
             commands::openclaw::start_gateway,
@@ -104,8 +127,20 @@ pub fn run() {
             commands::openclaw::read_logs,
             commands::repair::run_diagnosis,
             commands::repair::auto_fix,
+            commands::repair::run_doctor,
+            commands::repair::run_gateway_reinstall,
+            commands::repair::run_sessions_cleanup,
             commands::openclaw::check_update,
             commands::openclaw::do_update,
+            commands::agent::get_agent_api_key,
+            commands::agent::execute_agent_shell,
+            commands::agent::execute_agent_sudo_shell,
+            commands::agent::get_agent_config,
+            commands::agent::save_agent_config,
+            commands::channels::test_telegram,
+            commands::channels::send_telegram_test_message,
+            commands::channels::test_feishu,
+            commands::channels::send_feishu_test_message,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

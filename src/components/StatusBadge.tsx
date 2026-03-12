@@ -6,42 +6,41 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, label }: StatusBadgeProps) {
-  const configs = {
-    running: {
-      dot: 'bg-green-500',
-      pulse: 'animate-ping bg-green-400',
-      text: 'text-green-400',
-      defaultLabel: '运行中',
-    },
-    stopped: {
-      dot: 'bg-red-500',
-      pulse: '',
-      text: 'text-red-400',
-      defaultLabel: '已停止',
-    },
-    unknown: {
-      dot: 'bg-gray-500',
-      pulse: '',
-      text: 'text-gray-400',
-      defaultLabel: '未知',
-    },
-  }
+  const cfg = {
+    running: { color: '#34C759', defaultLabel: '运行中', pulse: true },
+    stopped: { color: '#FF3B30', defaultLabel: '已停止', pulse: false },
+    unknown: { color: '#AEAEB2', defaultLabel: '未知',   pulse: false },
+  }[status]
 
-  const cfg = configs[status]
   const displayLabel = label ?? cfg.defaultLabel
 
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="relative flex h-2.5 w-2.5">
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ position: 'relative', display: 'inline-flex', width: 9, height: 9 }}>
         {cfg.pulse && (
-          <span
-            className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${cfg.pulse}`}
-          />
+          <span style={{
+            position: 'absolute', inset: 0,
+            borderRadius: '50%',
+            background: cfg.color,
+            opacity: 0.4,
+            animation: 'sb-pulse 1.5s ease-in-out infinite',
+          }} />
         )}
-        <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${cfg.dot}`} />
+        <span style={{
+          position: 'relative',
+          width: 9, height: 9,
+          borderRadius: '50%',
+          background: cfg.color,
+          display: 'block',
+        }} />
       </span>
-      <span className={`text-sm font-medium ${cfg.text}`}>{displayLabel}</span>
+      <span style={{ fontSize: 13, fontWeight: 500, color: cfg.color }}>{displayLabel}</span>
+      <style>{`
+        @keyframes sb-pulse {
+          0%, 100% { transform: scale(1); opacity: 0.4; }
+          50% { transform: scale(2.2); opacity: 0; }
+        }
+      `}</style>
     </span>
   )
 }
-
