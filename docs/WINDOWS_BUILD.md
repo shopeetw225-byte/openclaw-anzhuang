@@ -70,11 +70,9 @@ src-tauri/target/release/bundle/
   "bundle": {
     "windows": {
       "certificateThumbprint": null,      // 代码签名证书指纹（可选）
-      "signingIdentity": null,            // 签名标识（可选）
-      "allowSignless": true,              // 允许无签名安装
       "webviewInstallMode": {
-        "silent": true,                   // 静默安装 WebView2
-        "runAfterInstall": true          // 安装后自动运行应用
+        "type": "downloadBootstrapper",  // 下载 WebView2 引导程序
+        "silent": true                   // 静默安装 WebView2
       },
       "wix": null                        // WiX 工具链配置（使用 MSI）
     }
@@ -95,8 +93,7 @@ src-tauri/target/release/bundle/
    {
      "bundle": {
        "windows": {
-         "certificateThumbprint": "YOUR_CERT_THUMBPRINT",
-         "signingIdentity": "YOUR_IDENTITY_NAME"
+         "certificateThumbprint": "YOUR_CERT_THUMBPRINT"
        }
      }
    }

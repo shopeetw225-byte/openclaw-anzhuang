@@ -39,11 +39,9 @@
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
-      "signingIdentity": null,
-      "allowSignless": true,
       "webviewInstallMode": {
-        "silent": true,
-        "runAfterInstall": true
+        "type": "downloadBootstrapper",
+        "silent": true
       },
       "wix": null
     },
