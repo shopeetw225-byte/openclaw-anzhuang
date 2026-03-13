@@ -100,12 +100,27 @@ export default function Uninstall() {
                 disabled
               />
               <OptionRow
+                icon="🔍"
+                title="仅预览（DRY RUN）"
+                desc="只扫描不删除，查看会清理哪些项目"
+                checked={dryRun}
+                onChange={setDryRun}
+              />
+              <OptionRow
+                icon="⚙️"
+                title="逐项选择"
+                desc="卸载时逐项确认要删除的内容"
+                checked={selectMode}
+                onChange={setSelectMode}
+              />
+              <OptionRow
                 icon="🗂️"
-                title="同时删除配置和数据"
+                title="删除配置和数据"
                 desc={`删除 ~/.openclaw 目录（API Key、会话记录、日志等）`}
-                checked={purge}
-                onChange={setPurge}
+                checked={purge && !dryRun}
+                onChange={(v) => setPurge(v)}
                 warn
+                disabled={dryRun}
               />
             </div>
 

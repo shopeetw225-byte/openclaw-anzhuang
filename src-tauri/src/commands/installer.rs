@@ -79,20 +79,53 @@ fn resolve_script_path(resource_dir: &Path, script_name: &str) -> Option<PathBuf
     None
 }
 
-/// 卸载 OpenClaw。purge=true 时同时删除 ~/.openclaw 数据目录。
+/// 卸载 OpenClaw。
+/// 参数：
+/// - purge: 删除 ~/.openclaw 数据目录
+/// - dry_run: 仅扫描不删除
+/// - select_mode: 逐项选择
 #[tauri::command]
-pub async fn run_uninstall(app: tauri::AppHandle, purge: bool) -> Result<(), String> {
+pub async fn run_uninstall(
+    app: tauri::AppHandle,
+    purge: bool,
+    dry_run: Option<bool>,
+    select_mode: Option<bool>,
+) -> Result<(), String> {
     let resource_dir = app
         .path()
         .resource_dir()
         .map_err(|e| format!("无法获取资源目录: {e}"))?;
 
+    let mut extra_args = Vec::new();
+
+    // 处理参数
+    if dry_run.unwrap_or(false) {
+        #[cfg(target_os = "windows")]
+        extra_args.push("-DryRun");
+        #[cfg(not(target_os = "windows"))]
+        extra_args.push("--dry-run");
+    }
+
+    if !purge && !dry_run.unwrap_or(false) {
+        #[cfg(target_os = "windows")]
+        extra_args.push("-KeepConfig");
+        #[cfg(not(target_os = "windows"))]
+        extra_args.push("--keep-config");
+    }
+
+    if select_mode.unwrap_or(false) {
+        #[cfg(target_os = "windows")]
+        extra_args.push("-Select");
+        #[cfg(not(target_os = "windows"))]
+        extra_args.push("--select");
+    }
+
     #[cfg(target_os = "windows")]
     {
         let script_path = resolve_script_path(&resource_dir, "windows/uninstall-openclaw.ps1")
             .ok_or_else(|| "找不到卸载脚本 windows/uninstall-openclaw.ps1".to_string())?;
-        let extra: &[&str] = if purge { &["-Purge"] } else { &[] };
-        process_runner::run_powershell_script(&app, &script_path, extra)
+        let extra_strs: Vec<&str> = extra_args.iter().map(|s| *s).collect();
+        process_runner::run_powershell_script(&app, &script_path, &extra_strs)
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -100,8 +133,8 @@ pub async fn run_uninstall(app: tauri::AppHandle, purge: bool) -> Result<(), Str
         let script_path = resolve_script_path(&resource_dir, "uninstall-openclaw.sh")
             .ok_or_else(|| "找不到卸载脚本 uninstall-openclaw.sh".to_string())?;
         make_executable(&script_path)?;
-        let extra: &[&str] = if purge { &["--purge"] } else { &[] };
-        process_runner::run_bash_script(&app, &script_path, extra)
+        let extra_strs: Vec<&str> = extra_args.iter().map(|s| *s).collect();
+        process_runner::run_bash_script(&app, &script_path, &extra_strs)
     }
 }
 
