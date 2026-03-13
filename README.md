@@ -154,6 +154,8 @@ curl http://localhost:18789/health
 
 | 文档 | 说明 |
 |------|------|
+| **[⚡ Windows 快速开始](QUICK_START_WINDOWS.md)** | 🔥 新！3 分钟快速编译指南 |
+| **[📖 Windows 打包完整指南](WINDOWS_BUILD_GUIDE.md)** | 🔥 新！详细打包方案和故障排查 |
 | [快速开始](docs/QUICK_START.md) | 5 分钟快速部署指南 |
 | [Windows 构建指南](docs/WINDOWS_BUILD.md) | 本地构建 Windows 版本 |
 | [Windows 测试指南](WINDOWS_TEST_GUIDE.md) | 详细的 6 大测试场景 |
@@ -345,6 +347,23 @@ npm run tauri dev
 # 构建项目
 npm run tauri build
 ```
+
+### Windows 一键编译
+
+**在 Windows 机器上运行**：
+
+```powershell
+# 一键编译 Windows 版本（自动检查环境，生成 MSI/EXE）
+.\build-windows.ps1
+
+# 清理缓存后编译
+.\build-windows.ps1 -Clean
+
+# 不进行代码签名
+.\build-windows.ps1 -NoSign
+```
+
+详见 [Windows 快速开始](QUICK_START_WINDOWS.md) 和 [完整打包指南](WINDOWS_BUILD_GUIDE.md)。
 
 ### 贡献指南
 
