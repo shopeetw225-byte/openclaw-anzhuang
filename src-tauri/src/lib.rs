@@ -132,15 +132,16 @@ pub fn run() {
             commands::repair::run_sessions_cleanup,
             commands::openclaw::check_update,
             commands::openclaw::do_update,
-            commands::agent::get_agent_api_key,
-            commands::agent::execute_agent_shell,
-            commands::agent::execute_agent_sudo_shell,
-            commands::agent::get_agent_config,
-            commands::agent::save_agent_config,
-            commands::channels::test_telegram,
-            commands::channels::send_telegram_test_message,
-            commands::channels::test_feishu,
-            commands::channels::send_feishu_test_message,
+            // TODO: 调试模式 - 临时禁用 agent 和 channels
+            // commands::agent::get_agent_api_key,
+            // commands::agent::execute_agent_shell,
+            // commands::agent::execute_agent_sudo_shell,
+            // commands::agent::get_agent_config,
+            // commands::agent::save_agent_config,
+            // commands::channels::test_telegram,
+            // commands::channels::send_telegram_test_message,
+            // commands::channels::test_feishu,
+            // commands::channels::send_feishu_test_message,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
