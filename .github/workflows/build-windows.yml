@@ -39,6 +39,11 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
+      - name: Install VC++ Runtime (WiX)
+        shell: powershell
+        run: |
+          choco install vcredist140 -y
+
       - name: Install dependencies
         run: npm ci
 

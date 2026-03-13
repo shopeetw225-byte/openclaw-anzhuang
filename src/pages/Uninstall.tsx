@@ -20,6 +20,8 @@ export default function Uninstall() {
   const [step, setStep] = useState<Step>('confirm')
   const [error, setError] = useState<string | null>(null)
   const [purge, setPurge] = useState(false)
+  const [dryRun, setDryRun] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
 
   const startUninstall = useCallback(async () => {
     setStep('running')
@@ -35,7 +37,7 @@ export default function Uninstall() {
     }
 
     try {
-      await invoke<void>('run_uninstall', { purge })
+      await invoke<void>('run_uninstall', { purge: !dryRun && purge, dry_run: dryRun, select_mode: selectMode })
       setStep('done')
       useInstallStore.getState().setProgress(100)
       useInstallStore.getState().setCurrentStep('Done')
@@ -43,7 +45,7 @@ export default function Uninstall() {
       setError(e instanceof Error ? e.message : String(e))
       setStep('error')
     }
-  }, [clearLogs, purge])
+  }, [clearLogs, purge, dryRun, selectMode])
 
   return (
     <div style={{ minHeight: '100vh', background: '#F2F2F7' }}>
