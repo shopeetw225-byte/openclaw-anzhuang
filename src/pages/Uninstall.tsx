@@ -22,6 +22,8 @@ export default function Uninstall() {
   const [purge, setPurge] = useState(false)
   const [dryRun, setDryRun] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
+  const toggleDryRun = useCallback((v: boolean) => setDryRun(v), [setDryRun])
+  const toggleSelectMode = useCallback((v: boolean) => setSelectMode(v), [setSelectMode])
 
   const startUninstall = useCallback(async () => {
     setStep('running')
@@ -104,14 +106,14 @@ export default function Uninstall() {
                 title="仅预览（DRY RUN）"
                 desc="只扫描不删除，查看会清理哪些项目"
                 checked={dryRun}
-                onChange={setDryRun}
+                onChange={toggleDryRun}
               />
               <OptionRow
                 icon="⚙️"
                 title="逐项选择"
                 desc="卸载时逐项确认要删除的内容"
                 checked={selectMode}
-                onChange={setSelectMode}
+                onChange={toggleSelectMode}
               />
               <OptionRow
                 icon="🗂️"
