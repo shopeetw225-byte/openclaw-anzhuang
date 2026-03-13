@@ -1,27 +1,22 @@
-name: Publish Release
+name: 🚀 Publish Release
 
 on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  create-release:
+  build-windows:
     runs-on: windows-latest
-    name: Build and Publish Release
+    name: 🪟 Build Windows Release
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Extract version
-        id: version
-        shell: powershell
-        run: |
-          $tag = "${{ github.ref }}" -replace "refs/tags/", ""
-          $version = $tag -replace "^v", ""
-          Write-Output "version=$version" >> $env:GITHUB_OUTPUT
-          Write-Output "tag=$tag" >> $env:GITHUB_OUTPUT
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,86 +35,176 @@ jobs:
 
       - name: Build Tauri app
         run: npm run tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ""
 
-      - name: Prepare release files
+      - name: Prepare Windows artifacts
         shell: powershell
         run: |
-          $version = "${{ steps.version.outputs.version }}"
+          Write-Host "📦 Preparing Windows artifacts..." -ForegroundColor Cyan
           $bundlePath = "src-tauri/target/release/bundle"
-
-          # Create release artifacts directory
-          New-Item -ItemType Directory -Path "release-artifacts" -Force | Out-Null
+          New-Item -ItemType Directory -Path "windows-release" -Force | Out-Null
 
           # Copy MSI
-          $msiFiles = Get-ChildItem -Path "$bundlePath/msi/" -Filter "*.msi"
-          foreach ($file in $msiFiles) {
-            Copy-Item -Path $file.FullName -Destination "release-artifacts/"
-            Write-Host "✅ Copied MSI: $($file.Name)"
+          Get-ChildItem -Path "$bundlePath/msi/" -Filter "*.msi" -ErrorAction SilentlyContinue | ForEach-Object {
+            Copy-Item -Path $_.FullName -Destination "windows-release/"
+            Write-Host "✅ Included: $($_.Name)"
           }
 
           # Copy NSIS EXE
-          $exeFiles = Get-ChildItem -Path "$bundlePath/nsis/" -Filter "*.exe"
-          foreach ($file in $exeFiles) {
-            Copy-Item -Path $file.FullName -Destination "release-artifacts/"
-            Write-Host "✅ Copied EXE: $($file.Name)"
+          Get-ChildItem -Path "$bundlePath/nsis/" -Filter "*.exe" -ErrorAction SilentlyContinue | ForEach-Object {
+            Copy-Item -Path $_.FullName -Destination "windows-release/"
+            Write-Host "✅ Included: $($_.Name)"
           }
 
-          # List all artifacts
-          Write-Host "`nRelease artifacts:"
-          Get-ChildItem -Path "release-artifacts/" | ForEach-Object {
-            $size = [math]::Round($_.Length / 1MB, 2)
-            Write-Host "  - $($_.Name) ($size MB)"
-          }
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: windows-release/
+
+  build-macos:
+    runs-on: macos-latest
+    name: 🍎 Build macOS Release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Tauri app
+        run: npm run tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ""
+
+      - name: Prepare macOS artifacts
+        run: |
+          echo "📦 Preparing macOS artifacts..."
+          bundlePath="src-tauri/target/release/bundle"
+          mkdir -p macos-release
+
+          if [ -d "$bundlePath/dmg" ]; then
+            cp "$bundlePath/dmg"/* macos-release/ 2>/dev/null || true
+            ls -lh macos-release/ | awk '{print "✅ Included: " $NF}'
+          fi
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release
+          path: macos-release/
+
+  publish-release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    name: 📤 Publish to GitHub
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          TAG="${{ github.ref }}"
+          TAG="${TAG#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: release-files/windows/
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-release
+          path: release-files/macos/
+
+      - name: Prepare release notes
+        run: |
+          cat > release-notes.md << 'EOF'
+          # OpenClaw 安装器 ${{ steps.version.outputs.version }}
+
+          ## 📥 下载
+
+          ### 🪟 Windows
+          - **OpenClaw 安装器_x64.msi** - 推荐使用（Windows Installer）
+          - **OpenClaw 安装器_x64.exe** - NSIS 便携版
+
+          ### 🍎 macOS
+          - **OpenClaw 安装器_aarch64.dmg** - Apple Silicon (M1/M2/M3+)
+
+          ## ✨ 功能特性
+
+          ✅ 跨平台支持（Windows / macOS / Linux）
+          ✅ WSL2 自动检测和安装
+          ✅ Node.js 环境管理
+          ✅ Gateway 服务注册
+          ✅ 管理员权限检查
+          ✅ 友好的错误提示
+
+          ## 🚀 快速开始
+
+          1. 从上方选择对应系统的安装包
+          2. 下载并运行安装程序
+          3. 跟随安装向导完成配置
+          4. 重启应用即可使用
+
+          ## 📖 文档
+
+          - [编译指南](https://github.com/${{ github.repository }}/blob/main/COMPILE_WINDOWS.md)
+          - [Windows 测试指南](https://github.com/${{ github.repository }}/blob/main/WINDOWS_TEST_GUIDE.md)
+          - [项目主页](https://github.com/${{ github.repository }}/blob/main/docs/PROJECT.md)
+
+          ## 🙏 反馈
+
+          遇到问题？请在 [Issues](https://github.com/${{ github.repository }}/issues) 中反馈。
+          EOF
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.tag }}
+          body_path: release-notes.md
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
           files: |
-            release-artifacts/**/*
+            release-files/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload to latest.json for auto-update
-        shell: powershell
+      - name: Release summary
         run: |
-          $version = "${{ steps.version.outputs.version }}"
-          $msiFile = Get-ChildItem -Path "release-artifacts/" -Filter "*.msi" | Select-Object -First 1
-
-          if ($null -eq $msiFile) {
-            Write-Host "❌ MSI file not found!"
-            exit 1
-          }
-
-          $downloadUrl = "https://github.com/${{ github.repository }}/releases/download/v$version/$($msiFile.Name)"
-          $signature = ""  # 需要使用 cargo tauri signer sign 生成
-
-          $latestJson = @{
-            version = $version
-            notes = "Release $version"
-            pub_date = (Get-Date -AsUTC -Format "yyyy-MM-ddTHH:mm:ssZ")
-            platforms = @{
-              "windows-x86_64" = @{
-                signature = $signature
-                url = $downloadUrl
-              }
-            }
-          }
-
-          $latestJson | ConvertTo-Json | Out-File "latest.json" -Encoding UTF8
-          Write-Host "Generated latest.json:"
-          Get-Content "latest.json"
-
-      - name: Build release summary
-        if: success()
-        shell: powershell
-        run: |
-          Write-Host "🎉 Release published successfully!"
-          Write-Host ""
-          Write-Host "Release Info:"
-          Write-Host "  Tag: ${{ steps.version.outputs.tag }}"
-          Write-Host "  Version: ${{ steps.version.outputs.version }}"
-          Write-Host "  URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}"
+          echo "🎉 Release Published Successfully!"
+          echo ""
+          echo "📋 Release Info:"
+          echo "  Tag: ${{ steps.version.outputs.tag }}"
+          echo "  Version: ${{ steps.version.outputs.version }}"
+          echo "  URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}"
+          echo ""
+          echo "📦 Files:"
+          find release-files -type f | while read f; do
+            size=$(du -h "$f" | cut -f1)
+            echo "  - $(basename $f) ($size)"
+          done

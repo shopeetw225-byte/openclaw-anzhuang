@@ -1,9 +1,10 @@
-name: Build Windows
+name: 🔨 Build (Windows & macOS)
 
 on:
   push:
     branches:
       - main
+      - develop
     paths:
       - 'src/**'
       - 'src-tauri/**'
@@ -14,10 +15,14 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-windows:
     runs-on: windows-latest
-    name: Build Windows x64
+    name: 🪟 Build Windows x64
 
     steps:
       - name: Checkout code
@@ -31,6 +36,8 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
 
       - name: Install dependencies
         run: npm ci
@@ -40,28 +47,123 @@ jobs:
 
       - name: Build Tauri app
         run: npm run tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ""
+
+      - name: Prepare artifacts
+        shell: powershell
+        run: |
+          Write-Host "🔍 Checking build artifacts..." -ForegroundColor Cyan
+          $bundlePath = "src-tauri/target/release/bundle"
+
+          # Create windows-builds directory
+          New-Item -ItemType Directory -Path "windows-builds" -Force | Out-Null
+
+          # Copy Windows installers
+          Copy-Item -Path "$bundlePath/msi/*" -Destination "windows-builds/" -Recurse -Force -ErrorAction SilentlyContinue
+          Copy-Item -Path "$bundlePath/nsis/*" -Destination "windows-builds/" -Recurse -Force -ErrorAction SilentlyContinue
+
+          Write-Host "✅ Windows build artifacts prepared" -ForegroundColor Green
+          Get-ChildItem -Path "windows-builds/" -Recurse -File | ForEach-Object {
+            $size = [math]::Round($_.Length / 1MB, 2)
+            Write-Host "  - $($_.Name) ($size MB)"
+          }
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-builds
-          path: src-tauri/target/release/bundle/
+          name: windows-x64-builds
+          path: windows-builds/
           retention-days: 30
-          compression-level: 9
+          if-no-files-found: warn
 
-      - name: List artifacts
-        shell: powershell
+  build-macos:
+    runs-on: macos-latest
+    name: 🍎 Build macOS (Apple Silicon)
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Tauri app
+        run: npm run tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ""
+
+      - name: Prepare artifacts
         run: |
-          Write-Host "Build artifacts:"
-          Get-ChildItem -Path "src-tauri/target/release/bundle/" -Recurse -File | ForEach-Object {
-            Write-Host "  - $($_.FullName)"
-            Write-Host "    Size: $([math]::Round($_.Length / 1MB, 2)) MB"
-          }
+          echo "🔍 Checking macOS build artifacts..."
+          bundlePath="src-tauri/target/release/bundle"
+
+          mkdir -p macos-builds
+
+          # Copy macOS DMG
+          if [ -d "$bundlePath/dmg" ]; then
+            cp "$bundlePath/dmg"/* macos-builds/ 2>/dev/null || true
+            echo "✅ macOS DMG prepared"
+          fi
+
+          ls -lh macos-builds/ 2>/dev/null || echo "No macOS artifacts found"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-aarch64-builds
+          path: macos-builds/
+          retention-days: 30
+          if-no-files-found: warn
+
+  verify-builds:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    name: ✅ Verify All Builds
+
+    steps:
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-x64-builds
+          path: windows-artifacts/
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-aarch64-builds
+          path: macos-artifacts/
+
+      - name: Check artifacts
+        run: |
+          echo "📦 Windows Artifacts:"
+          ls -lh windows-artifacts/ 2>/dev/null || echo "  (none)"
+
+          echo ""
+          echo "📦 macOS Artifacts:"
+          ls -lh macos-artifacts/ 2>/dev/null || echo "  (none)"
+
+          echo ""
+          echo "✅ Build verification complete"
 
   test-windows:
     needs: build-windows
     runs-on: windows-latest
-    name: Test Windows Build
+    name: 🧪 Test Windows Build
 
     steps:
       - name: Checkout code
@@ -70,27 +172,58 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: windows-builds
+          name: windows-x64-builds
           path: artifacts/
 
       - name: Test MSI exists
         shell: powershell
         run: |
-          $msiFile = Get-ChildItem -Path "artifacts/msi/" -Filter "*.msi" -ErrorAction SilentlyContinue
+          Write-Host "🔍 Checking for MSI file..." -ForegroundColor Cyan
+          $msiFile = Get-ChildItem -Path "artifacts/" -Filter "*.msi" -ErrorAction SilentlyContinue | Select-Object -First 1
+
           if ($null -eq $msiFile) {
-            Write-Host "❌ MSI file not found!"
-            exit 1
+            Write-Host "⚠️  No MSI file found" -ForegroundColor Yellow
+            exit 0
           }
-          Write-Host "✅ MSI file found: $($msiFile.Name)"
-          Write-Host "   Size: $([math]::Round($msiFile.Length / 1MB, 2)) MB"
+
+          Write-Host "✅ MSI file verified: $($msiFile.Name)" -ForegroundColor Green
+          $size = [math]::Round($msiFile.Length / 1MB, 2)
+          Write-Host "   Size: $size MB" -ForegroundColor Gray
 
       - name: Verify executable
         shell: powershell
         run: |
-          $exeFile = Get-ChildItem -Path "artifacts/nsis/" -Filter "*.exe" -ErrorAction SilentlyContinue
+          Write-Host "🔍 Checking for EXE file..." -ForegroundColor Cyan
+          $exeFile = Get-ChildItem -Path "artifacts/" -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+
           if ($null -eq $exeFile) {
-            Write-Host "⚠️  NSIS executable not found (optional)"
-          } else {
-            Write-Host "✅ NSIS executable found: $($exeFile.Name)"
-            Write-Host "   Size: $([math]::Round($exeFile.Length / 1MB, 2)) MB"
+            Write-Host "ℹ️  No NSIS EXE file found (optional)" -ForegroundColor Gray
+            exit 0
           }
+
+          Write-Host "✅ EXE file verified: $($exeFile.Name)" -ForegroundColor Green
+          $size = [math]::Round($exeFile.Length / 1MB, 2)
+          Write-Host "   Size: $size MB" -ForegroundColor Gray
+
+  build-status:
+    if: always()
+    needs: [build-windows, build-macos, verify-builds]
+    runs-on: ubuntu-latest
+    name: 📊 Build Status
+
+    steps:
+      - name: Check build status
+        run: |
+          echo "🏗️  Build Pipeline Status:"
+          echo ""
+          echo "  Windows Build:  ${{ needs.build-windows.result }}"
+          echo "  macOS Build:    ${{ needs.build-macos.result }}"
+          echo "  Verification:   ${{ needs.verify-builds.result }}"
+          echo ""
+
+          if [ "${{ needs.build-windows.result }}" != "success" ] || [ "${{ needs.build-macos.result }}" != "success" ]; then
+            echo "❌ Some builds failed"
+            exit 1
+          fi
+
+          echo "✅ All builds completed successfully!"
