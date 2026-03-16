@@ -12,8 +12,9 @@ pub fn collect_system_info() -> crate::SystemInfo {
     let os_name = {
         #[cfg(target_os = "macos")]
         {
-            match run_command_simple("uname", &["-r"]) {
-                Some(release) if !release.is_empty() => format!("macOS {release}"),
+            // 使用 sw_vers 获取用户熟悉的产品版本号（如 "15.5"），而非 uname -r 的内核版本
+            match run_command_simple("sw_vers", &["-productVersion"]) {
+                Some(ver) if !ver.is_empty() => format!("macOS {ver}"),
                 _ => "macOS".to_string(),
             }
         }
@@ -266,16 +267,28 @@ fn resolve_node() -> Option<PathBuf> {
         candidates.push(PathBuf::from("/usr/local/bin/node"));
         candidates.push(PathBuf::from("/opt/homebrew/bin/node"));
 
-        // 扫描 ~/node-v* 和 ~/node-* 目录（用户直接下载解压的 Node.js）
+        // 扫描 ~/node-v* 目录（用户直接下载解压的 Node.js）
+        // 只匹配 node-v 开头（如 node-v22.0.0-darwin-arm64），避免遍历整个 HOME
         if let Some(home) = home_dir() {
-            if let Ok(entries) = fs::read_dir(&home) {
-                for entry in entries.flatten() {
-                    let name = entry.file_name();
-                    let name_str = name.to_string_lossy();
-                    if name_str.starts_with("node-v") || name_str.starts_with("node-") {
-                        let candidate = entry.path().join("bin").join("node");
-                        if candidate.is_file() {
-                            candidates.push(candidate);
+            // 检查几个常见的解压版本号，避免 read_dir 整个 HOME
+            for major in ["22", "20", "21", "18"] {
+                let candidate = home.join(format!("node-v{major}")).join("bin").join("node");
+                if candidate.is_file() {
+                    candidates.push(candidate);
+                    break;
+                }
+                // 也尝试匹配完整版本号目录（glob 不可用，只检测目录是否存在）
+                let prefix = format!("node-v{major}.");
+                if let Ok(entries) = fs::read_dir(&home) {
+                    for entry in entries.take(500).flatten() {
+                        let name = entry.file_name();
+                        let name_str = name.to_string_lossy();
+                        if name_str.starts_with(&prefix) {
+                            let candidate = entry.path().join("bin").join("node");
+                            if candidate.is_file() {
+                                candidates.push(candidate);
+                            }
+                            break; // 找到一个就够了
                         }
                     }
                 }
@@ -385,7 +398,17 @@ fn resolve_openclaw(node_path: &Option<PathBuf>) -> Option<PathBuf> {
     }
 
     candidates.extend(nvm_bin_candidates("openclaw"));
-    resolve_executable("openclaw", &candidates)
+    if let Some(found) = resolve_executable("openclaw", &candidates) {
+        return Some(found);
+    }
+
+    // 最终回退：通过用户 login shell 查找（与 resolve_node / resolve_npm 保持一致）
+    #[cfg(not(target_os = "windows"))]
+    {
+        which_in_login_shell("openclaw")
+    }
+    #[cfg(target_os = "windows")]
+    None
 }
 
 fn resolve_executable(cmd: &str, extra_candidates: &[PathBuf]) -> Option<PathBuf> {
@@ -401,7 +424,6 @@ fn resolve_executable(cmd: &str, extra_candidates: &[PathBuf]) -> Option<PathBuf
         .iter()
         .find(|p| p.is_file())
         .cloned()
-        .or_else(|| None)
 }
 
 fn which(cmd: &str) -> Option<PathBuf> {
@@ -466,16 +488,16 @@ fn nvm_bin_candidates(binary: &str) -> Vec<PathBuf> {
 /// 通过用户 shell 查找命令路径（macOS/Linux）
 /// 用于打包后 app PATH 极简、静态候选全部失败时的最终回退
 /// 依次尝试：
-///   1. zsh/bash -i -l（交互+登录，同时加载 .zshrc 和 .zprofile）
+///   1. zsh/bash -l（登录 shell，加载 .zprofile/.bash_profile）
 ///   2. 直接读取 ~/.zshrc / ~/.bash_profile 中的 export PATH 行
 #[cfg(not(target_os = "windows"))]
 fn which_in_login_shell(cmd: &str) -> Option<PathBuf> {
     let shell = env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
 
-    // 尝试交互+登录 shell（zsh -i -l 会同时读 .zprofile 和 .zshrc）
+    // 使用登录 shell（-l）而非交互式（-i），避免加载 oh-my-zsh 等插件导致 2-5 秒卡顿
     let script = format!("which {cmd} 2>/dev/null || command -v {cmd} 2>/dev/null");
     let output = std::process::Command::new(&shell)
-        .args(["-i", "-l", "-c", &script])
+        .args(["-l", "-c", &script])
         .stdin(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .output()

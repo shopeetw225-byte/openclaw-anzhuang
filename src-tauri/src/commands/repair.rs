@@ -1,12 +1,11 @@
-use std::path::PathBuf;
 use crate::{DiagnosisItem, RepairResult};
 
 #[tauri::command]
 pub async fn run_diagnosis() -> RepairResult {
     let mut items = Vec::new();
 
-    // Check 1: OpenClaw installed
-    let openclaw_ok = which("openclaw").is_some();
+    // Check 1: OpenClaw installed（使用 platform.rs 统一查找逻辑）
+    let openclaw_ok = crate::core::platform::resolve_openclaw_path().is_some();
     items.push(DiagnosisItem {
         check_name: "OpenClaw 安装".to_string(),
         passed: openclaw_ok,
@@ -165,119 +164,9 @@ pub async fn run_sessions_cleanup(app: tauri::AppHandle) -> Result<(), String> {
 
 // --- helpers -----------------------------------------------------------------
 
-/// 查找 openclaw 可执行文件路径（兼容 PATH 受限的打包 app 环境）
-fn find_openclaw_bin() -> Option<PathBuf> {
-    // 1. 系统 which / where
-    #[cfg(target_os = "windows")]
-    let out = std::process::Command::new("where").arg("openclaw").output().ok();
-    #[cfg(not(target_os = "windows"))]
-    let out = std::process::Command::new("which").arg("openclaw").output().ok();
-    if let Some(o) = out {
-        if o.status.success() {
-            let s = String::from_utf8_lossy(&o.stdout);
-            let p = s.lines().next().unwrap_or("").trim();
-            if !p.is_empty() {
-                return Some(PathBuf::from(p));
-            }
-        }
-    }
-
-    let home = std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(PathBuf::from)?;
-
-    #[cfg(target_os = "windows")]
-    {
-        // 常见 npm 全局 bin：%APPDATA%\npm\openclaw.cmd
-        if let Some(appdata) = std::env::var_os("APPDATA").map(PathBuf::from) {
-            let p = appdata.join("npm").join("openclaw.cmd");
-            if p.is_file() {
-                return Some(p);
-            }
-        }
-    }
-
-    // 2. 扫描 ~/node-v* 直接解压安装的 Node.js
-    if let Ok(entries) = std::fs::read_dir(&home) {
-        for entry in entries.flatten() {
-            let name = entry.file_name();
-            let n = name.to_string_lossy();
-            if n.starts_with("node-v") || n.starts_with("node-") {
-                let candidate = entry.path().join("bin").join("openclaw");
-                if candidate.is_file() {
-                    return Some(candidate);
-                }
-            }
-        }
-    }
-
-    // 3. 解析 ~/.zshrc / ~/.bash_profile 里的 export PATH 行
-    let home_str = home.to_string_lossy().to_string();
-    let rc_files = [
-        home.join(".zshrc"),
-        home.join(".zprofile"),
-        home.join(".bash_profile"),
-        home.join(".bashrc"),
-    ];
-    for rc in &rc_files {
-        let Ok(content) = std::fs::read_to_string(rc) else { continue };
-        for line in content.lines() {
-            let line = line.trim();
-            if !line.starts_with("export PATH") { continue }
-            let val = line.splitn(2, '=').nth(1).unwrap_or("")
-                .trim_matches('"').trim_matches('\'');
-            for seg in val.split(':') {
-                let seg = seg.replace("$HOME", &home_str).replace("${HOME}", &home_str);
-                if seg.is_empty() || seg.contains('$') { continue }
-                let candidate = PathBuf::from(&seg).join("openclaw");
-                if candidate.is_file() {
-                    return Some(candidate);
-                }
-            }
-        }
-    }
-
-    // 4. 常见固定路径
-    for p in &[
-        "/usr/local/bin/openclaw",
-        "/opt/homebrew/bin/openclaw",
-    ] {
-        let pb = PathBuf::from(p);
-        if pb.is_file() { return Some(pb); }
-    }
-
-    None
-}
-
-fn which(cmd: &str) -> Option<PathBuf> {
-    // 复用 find_openclaw_bin 的逻辑，但针对任意命令
-    #[cfg(target_os = "windows")]
-    let out = std::process::Command::new("where").arg(cmd).output().ok();
-    #[cfg(not(target_os = "windows"))]
-    let out = std::process::Command::new("which").arg(cmd).output().ok();
-
-    let out = out
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).lines().next().unwrap_or("").trim().to_string())
-        .filter(|s| !s.is_empty())
-        .map(PathBuf::from);
-    if out.is_some() { return out; }
-
-    // ~/node-v* scan
-    let home = std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(PathBuf::from)?;
-    if let Ok(entries) = std::fs::read_dir(&home) {
-        for entry in entries.flatten() {
-            let name = entry.file_name();
-            let n = name.to_string_lossy();
-            if n.starts_with("node-v") || n.starts_with("node-") {
-                let candidate = entry.path().join("bin").join(cmd);
-                if candidate.is_file() { return Some(candidate); }
-            }
-        }
-    }
-    None
+/// 查找 openclaw 可执行文件路径 — 统一复用 platform.rs 的查找逻辑
+fn find_openclaw_bin() -> Option<std::path::PathBuf> {
+    crate::core::platform::resolve_openclaw_path()
 }
 
 fn is_port_open(port: u16) -> bool {

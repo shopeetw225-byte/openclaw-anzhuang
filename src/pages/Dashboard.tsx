@@ -251,8 +251,8 @@ export default function Dashboard() {
               divider
             />
             <InfoRow
-              label="LaunchAgent"
-              value={status?.launchagent_loaded ? '已加载' : '未加载'}
+              label="开机自启"
+              value={status?.launchagent_loaded ? '已启用' : '未启用'}
               valueColor={status?.launchagent_loaded ? '#34C759' : '#FF3B30'}
               divider
             />

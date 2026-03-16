@@ -163,9 +163,15 @@ try {
     }
   }
 
+  # MSI/winget 安装后当前进程的 PATH 不会自动刷新，从注册表重新读取
+  $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+  $userPath    = [Environment]::GetEnvironmentVariable('Path', 'User')
+  $env:Path = "$machinePath;$userPath"
+  Write-Log 'PATH 已从注册表刷新'
+
   $nodePath = Find-NodePath
   if (-not $nodePath) {
-    throw '安装完成后仍未找到 node.exe（PATH 可能未刷新）'
+    throw '安装完成后仍未找到 node.exe（请检查安装是否成功或重启终端后重试）'
   }
 
   $ver = & $nodePath -v 2>$null

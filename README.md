@@ -7,6 +7,14 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](README.md)
 [![Version](https://img.shields.io/badge/Version-0.1.0-brightgreen)](https://github.com/shopeetw225-byte/openclaw-anzhuang/releases)
 
+<div align="center">
+
+### 📥 [立即下载最新版本](https://github.com/shopeetw225-byte/openclaw-anzhuang/releases/latest)
+
+**Windows MSI / EXE** | **macOS DMG (Intel / Apple Silicon)** | **Linux**
+
+</div>
+
 ---
 
 ## ✨ 功能特性
@@ -72,6 +80,17 @@ OpenClaw_安装器_x64_zh-CN.exe
 # 将 OpenClaw 拖入 Applications 文件夹
 # 从 Applications 启动
 ```
+
+> ⚠️ **首次打开提示"已损坏"或"无法验证开发者"？**
+>
+> 这是因为当前版本尚未购买 Apple 开发者签名。请在终端运行以下命令后重新打开：
+> ```bash
+> sudo xattr -rd com.apple.quarantine /Applications/OpenClaw\ 安装器.app
+> ```
+> 或者在打开 DMG 前先解除隔离：
+> ```bash
+> xattr -cr ~/Downloads/OpenClaw*.dmg
+> ```
 
 **最低要求**：
 - macOS 11.0+ (Big Sur)
@@ -154,11 +173,11 @@ curl http://localhost:18789/health
 
 | 文档 | 说明 |
 |------|------|
-| **[⚡ Windows 快速开始](QUICK_START_WINDOWS.md)** | 🔥 新！3 分钟快速编译指南 |
-| **[📖 Windows 打包完整指南](WINDOWS_BUILD_GUIDE.md)** | 🔥 新！详细打包方案和故障排查 |
+| **[⚡ Windows 快速开始](docs/QUICK_START_WINDOWS.md)** | 3 分钟快速编译指南 |
+| **[📖 Windows 打包完整指南](docs/WINDOWS_BUILD_GUIDE.md)** | 详细打包方案和故障排查 |
 | [快速开始](docs/QUICK_START.md) | 5 分钟快速部署指南 |
 | [Windows 构建指南](docs/WINDOWS_BUILD.md) | 本地构建 Windows 版本 |
-| [Windows 测试指南](WINDOWS_TEST_GUIDE.md) | 详细的 6 大测试场景 |
+| [Windows 测试指南](docs/WINDOWS_TEST_GUIDE.md) | 详细的 6 大测试场景 |
 | [发布检查清单](docs/RELEASE_CHECKLIST.md) | 版本发布前检查项 |
 | [项目规划](docs/PROJECT.md) | M1-M6 完整规划 |
 | [配置参考](docs/CONFIG.md) | Gateway 配置选项 |
@@ -196,6 +215,12 @@ openclaw gateway restart
 ## 🛠️ 故障排查
 
 ### 常见问题
+
+#### ❌ macOS 提示"已损坏"或"无法验证开发者"
+```bash
+# 在终端运行后重新打开 app
+sudo xattr -rd com.apple.quarantine /Applications/OpenClaw\ 安装器.app
+```
 
 #### ❌ "需要管理员权限"
 ```powershell
@@ -363,7 +388,7 @@ npm run tauri build
 .\build-windows.ps1 -NoSign
 ```
 
-详见 [Windows 快速开始](QUICK_START_WINDOWS.md) 和 [完整打包指南](WINDOWS_BUILD_GUIDE.md)。
+详见 [Windows 快速开始](docs/QUICK_START_WINDOWS.md) 和 [完整打包指南](docs/WINDOWS_BUILD_GUIDE.md)。
 
 ### 贡献指南
 

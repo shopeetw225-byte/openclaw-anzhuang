@@ -6,6 +6,8 @@ use std::{
     time::Duration,
 };
 
+use super::platform;
+
 const GATEWAY_PORT: u16 = 18_789;
 #[cfg(target_os = "windows")]
 const WINDOWS_SERVICE_NAME: &str = "openclaw-gateway";
@@ -122,7 +124,7 @@ pub fn start_gateway() -> Result<(), String> {
             return Ok(());
         }
 
-        if run_command_success("openclaw", &["gateway", "start"]) {
+        if run_openclaw_success(&["gateway", "start"]) {
             return Ok(());
         }
 
@@ -137,7 +139,7 @@ pub fn start_gateway() -> Result<(), String> {
             }
         }
 
-        if run_command_success("openclaw", &["gateway", "start"]) {
+        if run_openclaw_success(&["gateway", "start"]) {
             return Ok(());
         }
 
@@ -149,7 +151,7 @@ pub fn start_gateway() -> Result<(), String> {
         if run_command_success("systemctl", &["--user", "start", "openclaw-gateway"]) {
             return Ok(());
         }
-        if run_command_success("openclaw", &["gateway", "start"]) {
+        if run_openclaw_success(&["gateway", "start"]) {
             return Ok(());
         }
         Err("启动 Gateway 失败".to_string())
@@ -166,7 +168,7 @@ pub fn stop_gateway() -> Result<(), String> {
         let mut any_ok = false;
 
         any_ok |= run_nssm_success(&["stop", WINDOWS_SERVICE_NAME]);
-        any_ok |= run_command_success("openclaw", &["gateway", "stop"]);
+        any_ok |= run_openclaw_success(&["gateway", "stop"]);
 
         thread::sleep(Duration::from_millis(400));
 
@@ -189,7 +191,7 @@ pub fn stop_gateway() -> Result<(), String> {
             any_ok |= run_command_success("launchctl", &["unload", &path_to_arg(&plist)]);
         }
 
-        any_ok |= run_command_success("openclaw", &["gateway", "stop"]);
+        any_ok |= run_openclaw_success(&["gateway", "stop"]);
 
         // Kill the process if still running.
         if let Some(pid) = gateway_pid() {
@@ -213,7 +215,7 @@ pub fn stop_gateway() -> Result<(), String> {
         let mut any_ok = false;
 
         any_ok |= run_command_success("systemctl", &["--user", "stop", "openclaw-gateway"]);
-        any_ok |= run_command_success("openclaw", &["gateway", "stop"]);
+        any_ok |= run_openclaw_success(&["gateway", "stop"]);
 
         if let Some(pid) = gateway_pid() {
             let pid_str = pid.to_string();
@@ -321,6 +323,26 @@ fn run_command_success(cmd: &str, args: &[&str]) -> bool {
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
+}
+
+/// 运行 openclaw 命令，自动解析完整路径并注入 Node bin 到 PATH。
+/// 解决打包后 .app 环境中 PATH 受限导致 bare "openclaw" 找不到的问题。
+fn run_openclaw_success(args: &[&str]) -> bool {
+    let Some(openclaw_path) = platform::resolve_openclaw_path() else {
+        return false;
+    };
+    let mut cmd = Command::new(&openclaw_path);
+    cmd.args(args);
+    // 注入 node bin 目录，确保 openclaw 内部的 Node.js shebang 能找到 node
+    if let Some(node_dir) = platform::node_bin_dir() {
+        let base = env::var_os("PATH").unwrap_or_default();
+        let mut paths: Vec<PathBuf> = vec![node_dir];
+        paths.extend(env::split_paths(&base));
+        if let Ok(joined) = env::join_paths(&paths) {
+            cmd.env("PATH", joined);
+        }
+    }
+    cmd.status().map(|s| s.success()).unwrap_or(false)
 }
 
 fn path_to_arg(path: &Path) -> String {

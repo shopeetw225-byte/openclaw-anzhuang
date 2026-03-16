@@ -291,12 +291,16 @@ if [ "$DRY_RUN" = "true" ]; then
     exit 0
 fi
 
-# 确认
-read -p "$(t confirm)" -n 1 -r response
-echo ""
-if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
-    echo "$(t cancelled)"
-    exit 0
+# 确认（如果 stdin 不是终端，如从 Tauri 调用，则跳过确认直接执行）
+if [ -t 0 ]; then
+    read -p "$(t confirm)" -n 1 -r response
+    echo ""
+    if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+        echo "$(t cancelled)"
+        exit 0
+    fi
+else
+    echo "(非交互模式，跳过确认)"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -375,7 +379,7 @@ for item in "${FOUND_ITEMS[@]}"; do
             echo -e "  ${GREEN}[$(t delete)]${NC}  launchd: $value"
             ;;
         process)
-            pkill -f "$value" 2>/dev/null || true
+            kill "$value" 2>/dev/null || true
             echo -e "  ${GREEN}[$(t delete)]${NC}  process: $value"
             ;;
         cron)

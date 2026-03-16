@@ -87,7 +87,16 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
-    name: 🍎 Build macOS (Apple Silicon)
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            arch: aarch64
+            label: Apple Silicon
+          - target: x86_64-apple-darwin
+            arch: x86_64
+            label: Intel
+    name: 🍎 Build macOS (${{ matrix.label }})
 
     steps:
       - name: Checkout code
@@ -105,7 +114,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin
+          targets: ${{ matrix.target }}
 
       - name: Install dependencies
         run: npm ci
@@ -114,14 +123,14 @@ jobs:
         run: npm run build
 
       - name: Build Tauri app
-        run: npm run tauri build
+        run: npm run tauri build -- --target ${{ matrix.target }}
         env:
           TAURI_SIGNING_PRIVATE_KEY: ""
 
       - name: Prepare artifacts
         run: |
           echo "🔍 Checking macOS build artifacts..."
-          bundlePath="src-tauri/target/release/bundle"
+          bundlePath="src-tauri/target/${{ matrix.target }}/release/bundle"
 
           mkdir -p macos-builds
 
@@ -136,7 +145,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: macos-aarch64-builds
+          name: macos-${{ matrix.arch }}-builds
           path: macos-builds/
           retention-days: 30
           if-no-files-found: warn
@@ -153,11 +162,17 @@ jobs:
           name: windows-x64-builds
           path: windows-artifacts/
 
-      - name: Download macOS artifacts
+      - name: Download macOS Apple Silicon artifacts
         uses: actions/download-artifact@v4
         with:
           name: macos-aarch64-builds
-          path: macos-artifacts/
+          path: macos-aarch64-artifacts/
+
+      - name: Download macOS Intel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-x86_64-builds
+          path: macos-x86_64-artifacts/
 
       - name: Check artifacts
         run: |
@@ -165,8 +180,12 @@ jobs:
           ls -lh windows-artifacts/ 2>/dev/null || echo "  (none)"
 
           echo ""
-          echo "📦 macOS Artifacts:"
-          ls -lh macos-artifacts/ 2>/dev/null || echo "  (none)"
+          echo "📦 macOS Apple Silicon Artifacts:"
+          ls -lh macos-aarch64-artifacts/ 2>/dev/null || echo "  (none)"
+
+          echo ""
+          echo "📦 macOS Intel Artifacts:"
+          ls -lh macos-x86_64-artifacts/ 2>/dev/null || echo "  (none)"
 
           echo ""
           echo "✅ Build verification complete"

@@ -43,29 +43,38 @@ jobs:
         run: |
           Write-Host "📦 Preparing Windows artifacts..." -ForegroundColor Cyan
           $bundlePath = "src-tauri/target/release/bundle"
-          New-Item -ItemType Directory -Path "windows-release" -Force | Out-Null
+          New-Item -ItemType Directory -Path "windows-x64-builds" -Force | Out-Null
 
           # Copy MSI
           Get-ChildItem -Path "$bundlePath/msi/" -Filter "*.msi" -ErrorAction SilentlyContinue | ForEach-Object {
-            Copy-Item -Path $_.FullName -Destination "windows-release/"
+            Copy-Item -Path $_.FullName -Destination "windows-x64-builds/"
             Write-Host "✅ Included: $($_.Name)"
           }
 
           # Copy NSIS EXE
           Get-ChildItem -Path "$bundlePath/nsis/" -Filter "*.exe" -ErrorAction SilentlyContinue | ForEach-Object {
-            Copy-Item -Path $_.FullName -Destination "windows-release/"
+            Copy-Item -Path $_.FullName -Destination "windows-x64-builds/"
             Write-Host "✅ Included: $($_.Name)"
           }
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-release
-          path: windows-release/
+          name: windows-x64-builds
+          path: windows-x64-builds/
 
   build-macos:
     runs-on: macos-latest
-    name: 🍎 Build macOS Release
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            arch: aarch64
+            label: Apple Silicon
+          - target: x86_64-apple-darwin
+            arch: x86_64
+            label: Intel
+    name: 🍎 Build macOS (${{ matrix.label }})
 
     steps:
       - name: Checkout code
@@ -80,7 +89,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin
+          targets: ${{ matrix.target }}
 
       - name: Install dependencies
         run: npm ci
@@ -89,26 +98,26 @@ jobs:
         run: npm run build
 
       - name: Build Tauri app
-        run: npm run tauri build
+        run: npm run tauri build -- --target ${{ matrix.target }}
         env:
           TAURI_SIGNING_PRIVATE_KEY: ""
 
       - name: Prepare macOS artifacts
         run: |
           echo "📦 Preparing macOS artifacts..."
-          bundlePath="src-tauri/target/release/bundle"
-          mkdir -p macos-release
+          bundlePath="src-tauri/target/${{ matrix.target }}/release/bundle"
+          mkdir -p macos-builds
 
           if [ -d "$bundlePath/dmg" ]; then
-            cp "$bundlePath/dmg"/* macos-release/ 2>/dev/null || true
-            ls -lh macos-release/ | awk '{print "✅ Included: " $NF}'
+            cp "$bundlePath/dmg"/* macos-builds/ 2>/dev/null || true
+            ls -lh macos-builds/ | awk '{print "✅ Included: " $NF}'
           fi
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: macos-release
-          path: macos-release/
+          name: macos-${{ matrix.arch }}-builds
+          path: macos-builds/
 
   publish-release:
     needs: [build-windows, build-macos]
@@ -131,13 +140,19 @@ jobs:
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
-          name: windows-release
+          name: windows-x64-builds
           path: release-files/windows/
 
-      - name: Download macOS artifacts
+      - name: Download macOS Apple Silicon artifacts
         uses: actions/download-artifact@v4
         with:
-          name: macos-release
+          name: macos-aarch64-builds
+          path: release-files/macos/
+
+      - name: Download macOS Intel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-x86_64-builds
           path: release-files/macos/
 
       - name: Prepare release notes
@@ -153,6 +168,9 @@ jobs:
 
           ### 🍎 macOS
           - **OpenClaw 安装器_aarch64.dmg** - Apple Silicon (M1/M2/M3+)
+          - **OpenClaw 安装器_x64.dmg** - Intel Mac
+
+          > ⚠️ 首次打开如提示"已损坏"，请在终端运行：`sudo xattr -rd com.apple.quarantine /Applications/OpenClaw\ 安装器.app`
 
           ## ✨ 功能特性
 
