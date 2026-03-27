@@ -1,446 +1,140 @@
-# 🚀 OpenClaw 安装器
+# OpenClaw 安装器
 
-> **一键部署 AI Agent Gateway** | 跨平台、自动化、零依赖
+OpenClaw 安装器是 OpenClaw 生态里的桌面安装和修复入口。它负责检测系统环境、安装或卸载 OpenClaw、管理 Gateway、写入配置，并提供更新与诊断界面。
 
-[![GitHub Stars](https://img.shields.io/github/stars/shopeetw225-byte/openclaw-anzhuang)](https://github.com/shopeetw225-byte/openclaw-anzhuang)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](README.md)
-[![Version](https://img.shields.io/badge/Version-0.1.0-brightgreen)](https://github.com/shopeetw225-byte/openclaw-anzhuang/releases)
+这个仓库不实现 OpenClaw 本体，它包装的是安装脚本、Tauri 桌面壳和平台相关的服务管理逻辑。
 
-<div align="center">
+## 项目定位
 
-### 📥 [立即下载最新版本](https://github.com/shopeetw225-byte/openclaw-anzhuang/releases/latest)
+- 面向最终用户：提供可下载的桌面安装包和一键式安装向导。
+- 面向维护者：提供修复、卸载、更新、日志查看和配置管理能力。
+- 面向开发者：保留本地开发和构建入口，方便继续迭代安装流程。
 
-**Windows MSI / EXE** | **macOS DMG (Intel / Apple Silicon)** | **Linux**
+## 支持平台
 
-</div>
+| 平台 | 当前形态 | 说明 |
+|------|----------|------|
+| Windows | Tauri 桌面应用 + PowerShell/WSL 辅助脚本 | 代码里已具备 Windows 相关检测、WSL 处理和卸载脚本入口。某些路径需要管理员权限。 |
+| macOS | Tauri 桌面应用 + bash 脚本 | 支持本机安装、LaunchAgent 管理和卸载。首次打开可能会遇到 macOS quarantine 提示。 |
+| Linux | Tauri 桌面应用 + bash/systemd 用户服务 | 支持 `install-linux.sh`、`install-service-linux.sh` 和卸载脚本。依赖 `systemd --user` 的场景会自动降级处理。 |
 
----
+Tauri 打包配置已经开启了 Windows、macOS 和 Linux 的 bundle 目标，具体发布产物是否可用仍取决于构建环境和发布流程。
 
-## ✨ 功能特性
+## 当前能力边界
 
-- 🎯 **一键安装** - 智能检测环境，自动部署 OpenClaw Gateway
-- 🪟 **Windows 完整支持** - WSL2 和原生 PowerShell 双路径
-  - WSL2 + Ubuntu 自动检测和安装
-  - Windows 家庭版、专业版、企业版全支持
-  - NSSM 服务管理，开机自启
-- 🍎 **macOS 支持** - 一键部署到 Intel/M1/M2/M3
-- 🐧 **Linux 支持** - Ubuntu、Debian、CentOS 自动识别
-- 📊 **实时监控** - Dashboard 查看 Gateway 状态
-- 🔧 **配置管理** - 可视化修改配置参数
-- 🛠️ **修复工具** - 一键诊断和修复常见问题
-- 📦 **卸载清理** - 完全卸载，无残留文件
+已在代码中实现的能力：
 
----
+- 系统信息与安装状态检测。
+- OpenClaw 安装、卸载、修复和更新流程。
+- Gateway 的启动、停止、重启和日志读取。
+- 配置读写，包含 `~/.openclaw/openclaw.json` 与相关环境变量文件。
+- 诊断页、修复页、更新页、卸载页和 Agent 相关页面。
+- 平台相关服务管理：macOS LaunchAgent、Linux systemd 用户服务、Windows 辅助脚本路径。
 
-## 📥 下载安装
+暂时不要把这个仓库理解成：
 
-### Windows
+- OpenClaw 后端本体。
+- 已经完全稳定的发布流水线。
+- 已经完成代码签名和所有平台的正式发行物打包。
 
-#### 方式 1️⃣ - MSI 安装包（推荐）
-```powershell
-# 下载最新版本
-# https://github.com/shopeetw225-byte/openclaw-anzhuang/releases/latest
+## 安装路径
 
-# 双击 OpenClaw_安装器_x64_zh-CN.msi
-# 跟随安装向导完成安装
-```
+### 1. 普通用户安装
 
-**最低要求**：
-- Windows 10 / Windows 11 (x64)
-- 管理员权限
-- 512 MB 磁盘空间
+优先从仓库的 Releases 页面下载最新安装包，然后按平台打开：
 
-#### 方式 2️⃣ - 便携版 EXE
-```powershell
-# 无需安装，直接运行
-OpenClaw_安装器_x64_zh-CN.exe
-```
+- Windows：`.msi` 推荐，`.exe` 适合便携运行。
+- macOS：`.dmg`
+- Linux：按发布产物或发行方式选择对应包。
 
-**支持环境**：
-| 系统 | WSL2 | 原生 PowerShell |
-|------|------|-----------------|
-| Windows 11 Pro/Enterprise | ✅ 优先 | ✅ 备选 |
-| Windows 11 Home | ❌ | ✅ 推荐 |
-| Windows 10 Pro/Enterprise | ✅ 优先 | ✅ 备选 |
-| Windows 10 Home | ❌ | ✅ 推荐 |
+### 2. macOS 直接安装
 
----
-
-### macOS
-
-#### Intel/M1/M2/M3 统一安装
 ```bash
-# 下载最新版本
-# https://github.com/shopeetw225-byte/openclaw-anzhuang/releases/latest
-
-# 双击 OpenClaw_安装器_x64.dmg （Intel）
-#   或 OpenClaw_安装器_aarch64.dmg （Apple Silicon）
-
-# 将 OpenClaw 拖入 Applications 文件夹
+# 下载 DMG 后，拖拽应用到 Applications
 # 从 Applications 启动
 ```
 
-> ⚠️ **首次打开提示"已损坏"或"无法验证开发者"？**
->
-> 这是因为当前版本尚未购买 Apple 开发者签名。请在终端运行以下命令后重新打开：
-> ```bash
-> sudo xattr -rd com.apple.quarantine /Applications/OpenClaw\ 安装器.app
-> ```
-> 或者在打开 DMG 前先解除隔离：
-> ```bash
-> xattr -cr ~/Downloads/OpenClaw*.dmg
-> ```
-
-**最低要求**：
-- macOS 11.0+ (Big Sur)
-- 512 MB 磁盘空间
-
----
-
-### Linux
-
-#### Ubuntu / Debian / CentOS
-```bash
-# 克隆项目
-git clone https://github.com/shopeetw225-byte/openclaw-anzhuang.git
-cd openclaw-anzhuang
-
-# 运行安装脚本
-chmod +x scripts/install-linux.sh
-sudo ./scripts/install-linux.sh
-
-# 验证安装
-openclaw --version
-openclaw gateway status
-```
-
-**支持的发行版**：
-- ✅ Ubuntu 20.04+
-- ✅ Debian 11+
-- ✅ CentOS 8+
-- ✅ Rocky Linux 8+
-
----
-
-## 🚀 快速开始
-
-### 1️⃣ 启动安装器
-
-**Windows**：
-```powershell
-# 双击 .msi 文件
-# 或右键以管理员身份运行 .exe
-```
-
-**macOS**：
-```bash
-# 双击 .dmg 文件
-# 或从 Applications 启动
-```
-
-**Linux**：
-```bash
-sudo ./scripts/install-linux.sh
-```
-
-### 2️⃣ 完成欢迎向导
-
-- ✅ 显示系统信息
-- ✅ 检测环境依赖
-- ✅ 验证管理员权限
-- ✅ 点击"一键安装"开始
-
-### 3️⃣ 监控安装进度
-
-- 实时日志输出
-- 进度条显示
-- 支持断点续装（重启后恢复）
-
-### 4️⃣ 验证安装
+如果首次打开提示“已损坏”或“无法验证开发者”，通常是因为当前版本还没有正式签名。可以先解除隔离再打开：
 
 ```bash
-# 检查 Gateway 状态
-curl http://localhost:18789/health
-
-# 或在安装器中
-# Welcome 页面 → 刷新 → Gateway 状态应显示"运行中"
-```
-
----
-
-## 📚 文档
-
-| 文档 | 说明 |
-|------|------|
-| **[⚡ Windows 快速开始](docs/QUICK_START_WINDOWS.md)** | 3 分钟快速编译指南 |
-| **[📖 Windows 打包完整指南](docs/WINDOWS_BUILD_GUIDE.md)** | 详细打包方案和故障排查 |
-| [快速开始](docs/QUICK_START.md) | 5 分钟快速部署指南 |
-| [Windows 构建指南](docs/WINDOWS_BUILD.md) | 本地构建 Windows 版本 |
-| [Windows 测试指南](docs/WINDOWS_TEST_GUIDE.md) | 详细的 6 大测试场景 |
-| [发布检查清单](docs/RELEASE_CHECKLIST.md) | 版本发布前检查项 |
-| [项目规划](docs/PROJECT.md) | M1-M6 完整规划 |
-| [配置参考](docs/CONFIG.md) | Gateway 配置选项 |
-
----
-
-## 🔧 配置管理
-
-### 修改 Gateway 参数
-
-1. **启动安装器** → **配置向导**
-2. 修改以下参数：
-   - `gateway_port` - 网关端口（默认 18789）
-   - `log_level` - 日志级别（debug/info/warn/error）
-   - `auto_start` - 开机自启（true/false）
-   - `proxy_url` - 代理地址（可选）
-
-3. **保存配置** → 自动重启 Gateway
-
-### 命令行配置
-
-```bash
-# 显示当前配置
-openclaw config show
-
-# 修改配置
-openclaw config set gateway_port 19000
-
-# 重启 Gateway
-openclaw gateway restart
-```
-
----
-
-## 🛠️ 故障排查
-
-### 常见问题
-
-#### ❌ macOS 提示"已损坏"或"无法验证开发者"
-```bash
-# 在终端运行后重新打开 app
 sudo xattr -rd com.apple.quarantine /Applications/OpenClaw\ 安装器.app
 ```
 
-#### ❌ "需要管理员权限"
+### 3. Linux 源码脚本安装
+
+```bash
+cd /path/to/openclaw-anzhuang
+bash scripts/install-linux.sh
+```
+
+需要只注册 systemd 用户服务时，可以单独运行：
+
+```bash
+bash scripts/install-service-linux.sh
+```
+
+### 4. Windows 相关脚本
+
+仓库里包含 Windows 的辅助脚本和安装器入口，适合调试或本地验证：
+
 ```powershell
-# 右键以管理员身份运行安装器
+# 安装 OpenClaw
+scripts\windows\install-openclaw.ps1
+
+# 启用 WSL
+scripts\windows\install-wsl.ps1
+
+# 安装 Ubuntu WSL 发行版
+scripts\windows\install-ubuntu.ps1
 ```
 
-#### ❌ "WSL 未安装"（Windows）
-```powershell
-# 安装器自动检测并安装 WSL2
-# 可能需要重启系统
-# 重启后点击"重试"继续
-```
+## 开发者快速开始
 
-#### ❌ "磁盘空间不足"
-```bash
-# 清理磁盘，至少需要 512 MB 可用空间
-df -h  # Linux/macOS
-wmic logicaldisk get name,freespace  # Windows
-```
-
-#### ❌ "Gateway 无法启动"
-```bash
-# 查看日志
-tail -f ~/.openclaw/logs/gateway.log
-
-# 检查端口占用
-lsof -i :18789  # Linux/macOS
-netstat -ano | findstr :18789  # Windows
-
-# 重启服务
-openclaw gateway restart
-```
-
-### 获取帮助
-
-1. 📖 查看 [完整文档](docs/)
-2. 🔍 检查 [常见问题 FAQ](docs/FAQ.md)
-3. 📝 提交 [GitHub Issue](https://github.com/shopeetw225-byte/openclaw-anzhuang/issues)
-4. 💬 联系技术支持
-
----
-
-## 📊 系统要求
-
-### Windows
-```
-✅ Windows 10 / 11 (x64)
-✅ 2GB RAM 最低配置
-✅ 512 MB 可用磁盘空间
-✅ 管理员权限
-✅ .NET Framework 4.7.2+ （仅 NSSM 服务需要）
-```
-
-### macOS
-```
-✅ macOS 11.0+ (Big Sur)
-✅ Intel 或 Apple Silicon (M1/M2/M3)
-✅ 2GB RAM 最低配置
-✅ 512 MB 可用磁盘空间
-✅ Xcode Command Line Tools
-```
-
-### Linux
-```
-✅ Ubuntu 20.04+
-✅ Debian 11+
-✅ CentOS 8+
-✅ 2GB RAM 最低配置
-✅ 512 MB 可用磁盘空间
-✅ Bash 4.0+ 或 Zsh
-```
-
----
-
-## 🔄 更新
-
-### 检查更新
+项目的开发入口很直接：
 
 ```bash
-# 自动检查更新
-openclaw update check
-
-# 显示当前版本
-openclaw --version
-```
-
-### 升级到最新版
-
-```bash
-# 自动升级
-openclaw update install
-
-# 或手动下载最新版本
-# https://github.com/shopeetw225-byte/openclaw-anzhuang/releases/latest
-```
-
----
-
-## 📦 卸载
-
-### Windows
-
-**通过控制面板**：
-1. 设置 → 应用 → 已安装的应用
-2. 找到 "OpenClaw 安装器"
-3. 点击卸载
-
-**通过安装器**：
-```powershell
-# 运行安装器 → 卸载选项
-```
-
-**完全清理**：
-```powershell
-# 移除配置文件
-Remove-Item -Recurse $HOME\.openclaw
-```
-
-### macOS / Linux
-
-```bash
-# 运行卸载脚本
-./scripts/uninstall-openclaw.sh
-
-# 或手动删除
-rm -rf ~/.openclaw
-rm -rf /usr/local/bin/openclaw
-```
-
----
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-### 开发设置
-
-```bash
-# 克隆项目
-git clone https://github.com/shopeetw225-byte/openclaw-anzhuang.git
-cd openclaw-anzhuang
-
-# 安装依赖
 npm install
-
-# 开发模式启动
 npm run tauri dev
+```
 
-# 构建项目
+构建前端和 Tauri 产物：
+
+```bash
+npm run build
 npm run tauri build
 ```
 
-### Windows 一键编译
+## 仓库结构
 
-**在 Windows 机器上运行**：
+- `src/`：React 前端，包含欢迎页、安装页、控制台、修复页、更新页、卸载页和 Agent 页面。
+- `src-tauri/`：Rust 后端命令、平台检测、服务管理、配置读写和更新逻辑。
+- `scripts/`：跨平台安装、卸载和发布脚本。
+- `docs/`：构建、测试、发布和里程碑说明。
+- `docker/`：Linux 容器化验证环境，主要用于脚本语法和依赖探测。
 
-```powershell
-# 一键编译 Windows 版本（自动检查环境，生成 MSI/EXE）
-.\build-windows.ps1
+## 开发进度
 
-# 清理缓存后编译
-.\build-windows.ps1 -Clean
+`docs/PROJECT.md` 是当前里程碑状态的主要参考。按那份文档：
 
-# 不进行代码签名
-.\build-windows.ps1 -NoSign
-```
+- M1：项目搭建 + macOS 完整安装流程，进行中。
+- M2：Dashboard + 监控 + 修复，已完成。
+- M3：Linux 支持，待开始。
+- M4：Windows 支持，待开始。
+- M5：更新 + 卸载 + 自更新，待开始。
+- M6：打磨 + CI/CD + 发布，待开始。
 
-详见 [Windows 快速开始](docs/QUICK_START_WINDOWS.md) 和 [完整打包指南](docs/WINDOWS_BUILD_GUIDE.md)。
+同时，代码仓库里已经能看到更完整的页面和命令入口，所以 README 这里更适合把它理解成“功能已落地到什么程度”，而不是“所有发布目标都已经正式完成”。
 
-### 贡献指南
+## 已知问题 / 路线图
 
-1. 🔀 Fork 项目
-2. 🌿 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 📝 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 📤 推送分支 (`git push origin feature/AmazingFeature`)
-5. 🔗 提交 Pull Request
+- macOS 首次打开仍可能遇到 quarantine 提示，后续需要正式签名来改善体验。
+- Linux 的 AppImage / deb 打包在文档里仍属于计划项。
+- 更新能力已经接入，但测试配置里仍保留了禁用标记和占位 pubkey。
+- Windows、macOS 的构建和发布流程已有文档，但最终对外分发是否可用，仍要看 CI/CD 和发布配置。
 
----
+## 相关文档
 
-## 📄 许可证
-
-本项目采用 [MIT 许可证](LICENSE) - 详见 LICENSE 文件
-
----
-
-## 🎯 功能路线图
-
-| M1 | M2 | M3 | M4 | M5 | M6 |
-|----|----|----|----|----|----|
-| ✅ | ✅ | ✅ | ✅ | ⏳ | ⏳ |
-| 项目搭建 | Dashboard | Linux 支持 | Windows 支持 | 更新/卸载 | 打磨/CI/CD |
-
-- ✅ 已完成
-- ⏳ 进行中
-- 📋 计划中
-
----
-
-## 📞 联系方式
-
-- 📧 Email: support@openclaw.dev
-- 🐛 Issues: [GitHub Issues](https://github.com/shopeetw225-byte/openclaw-anzhuang/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/shopeetw225-byte/openclaw-anzhuang/discussions)
-
----
-
-## 🙏 致谢
-
-感谢所有贡献者和用户的支持！
-
----
-
-**⭐ 如果对你有帮助，请给个 Star！**
-
----
-
-<div align="center">
-
-**[⬆ 回到顶部](#openclaw-安装器)**
-
-Made with ❤️ by OpenClaw Team
-
-</div>
+- [项目文档索引](docs/PROJECT.md)
+- [编译和打包状态](docs/BUILD_STATUS.md)
+- [Windows 构建指南](docs/WINDOWS_BUILD_GUIDE.md)
+- [Windows 测试指南](docs/WINDOWS_TEST_GUIDE.md)
